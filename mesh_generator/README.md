@@ -1,18 +1,24 @@
 # Finite Element Method Mesh Generator
 
-This repository provides tools for generating meshes for use in Finite Element Method simulations. The code allows for the generation of simple meshes as well as meshes with holes.
+This repository provides a set of Python tools for generating meshes suitable for Finite Element Method (FEM) simulations. The primary objective is to facilitate the creation of polygonal meshes, with or without holes, and offer visualization capabilities.
 
 ## Features
-
-- Generation of simple polygonal meshes.
-- Generation of polygonal meshes with holes.
-- Visualization of the generated mesh using `matplotlib`.
-- Exporting the mesh data to YAML and MATLAB formats.
+- **Mesh Generation**: Create simple polygonal meshes or meshes with holes.
+- **Visualization**: Visualize the generated mesh using `matplotlib`.
+- **Export Options**: Save the mesh data in YAML and MATLAB formats.
 
 ## Usage
+### Setup
+1. Clone the repository to your local machine.
+2. Ensure you have the required Python libraries installed.
+3. Define your geometry in a YAML file.
 
-1. Define your geometry in a YAML file.
-2. Run the `main.py` script.
+### Execution
+Run the `main.py` script:
+```bash
+python main.py
+```
+
 
 ## Directory Structure
 
@@ -20,7 +26,7 @@ This repository provides tools for generating meshes for use in Finite Element M
   - `Geometry.py`: Contains the `Geometry` class for loading boundary and hole data from a YAML file.
   - `MeshGenerator.py`: Contains the `MeshGenerator` class for generating the mesh.
   - `Visualizer.py`: Contains the `Visualizer` class for visualizing the generated mesh.
-- `main.py`: The main script to run the mesh generation.
+- `main.py`: The main entry point for mesh generation.
 
 ## Example
 
@@ -43,8 +49,9 @@ mesh:
 
 num-dim: 2
 ```
+
 <div style="text-align: center">
-    <img src="./Problem1/mesh_config.png" alt="Sample GIF" width="300" height="300">
+    <img src="./Problem1/mesh_config.png" alt="Sample GIF" width="600" height="480">
 </div>
 
 ### Example 3: Polygon with a Hole
@@ -67,7 +74,7 @@ num-dim: 2
 ```
 
 <div style="text-align: center">
-    <img src="./Problem3/mesh_config.png" alt="Sample GIF" width="300" height="300">
+    <img src="./Problem3/mesh_config.png" alt="Sample GIF" width="600" height="480">
 </div>
 
 ### Example 4: Irregular shape
@@ -112,11 +119,8 @@ num-dim: 2
 ```
 
 <div style="text-align: center">
-    <img src="./Problem4/mesh_config.png" alt="Sample GIF" width="300" height="300">
+    <img src="./Problem4/mesh_config.png" alt="Sample GIF" width="600" height="480">
 </div>
 
-After defining the geometry in a YAML file, simply run:
-```bash
-python main.py
-```
+
 
