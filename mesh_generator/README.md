@@ -74,7 +74,7 @@ num-dim: 2
 ```
 
 <div style="text-align: center">
-    <img src="./Problem3/mesh_config.png" alt="Sample GIF" width="600" height="480">
+    <img src="./Problem3/mesh_config.png" alt="Sample GIF" width="600*1.1" height="480*1.1">
 </div>
 
 ### Example 4: Irregular shape
@@ -119,7 +119,7 @@ num-dim: 2
 ```
 
 <div style="text-align: center">
-    <img src="./Problem4/mesh_config.png" alt="Sample GIF" width="600" height="480">
+    <img src="./Problem4/mesh_config.png" alt="Sample GIF" width="600*1.2" height="480*1.2">
 </div>
 
 
