@@ -1,19 +1,42 @@
 import numpy as np
 import triangle
+import yaml
+from typing import List, Tuple, Dict, Union
 
 class MeshGenerator:
     def __init__(self, geometry):
+        """
+        Initializes the MeshGenerator with a provided geometry.
+
+        Args:
+            geometry (Geometry): An instance of the Geometry class containing boundary and holes data.
+        """
         self.geometry = geometry
 
     def create_circle(self, center, radius, num_segments=20):
-        """Create a polygonal representation of a circle."""
+        """
+        Create a polygonal representation of a circle.
+
+        Args:
+            center (Tuple[float, float]): Coordinates for the center of the circle.
+            radius (float): Radius of the circle.
+            num_segments (int): Number of segments to represent the circle. Default is 20.
+
+        Returns:
+            np.ndarray: An array of shape (num_segments, 2) representing the circle coordinates.
+        """
         theta = np.linspace(0, 2 * np.pi, num_segments, endpoint=False)
         x = center[0] + radius * np.cos(theta)
         y = center[1] + radius * np.sin(theta)
         return np.column_stack((x, y))
 
-    def generate_mesh_with_hole(self):
-        """Generate mesh based on provided geometry."""
+    def generate_mesh_with_hole(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Generate a mesh considering the holes provided in the geometry.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: A tuple containing nodes (vertices) and elements (triangles).
+        """
         
         # Unpack boundary and holes
         boundary = np.array(self.geometry.boundary)
@@ -42,8 +65,13 @@ class MeshGenerator:
         
         return mesh['vertices'], mesh['triangles']
 
-    def generate_simple_mesh(self):
-        """Generate mesh without considering any holes."""
+    def generate_simple_mesh(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Generate a mesh without considering any holes.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: A tuple containing nodes (vertices) and elements (triangles).
+        """
         
         # Unpack boundary
         boundary = np.array(self.geometry.boundary)
@@ -61,22 +89,36 @@ class MeshGenerator:
         
         return mesh['vertices'], mesh['triangles']
 
-    def write_output_file(self, filename, nodes, elements):
+    @staticmethod
+    def write_output_file_yaml(filename, nodes: np.ndarray, elements: np.ndarray, ndim: int = 2):
+        """
+        Write the generated mesh to a YAML file.
+
+        Args:
+            filename (str): The name/path of the output YAML file.
+            nodes (np.ndarray): A 2D array of node coordinates.
+            elements (np.ndarray): A 2D array of element connectivity.
+        """
+
+        data = {
+            'PARAMETER': {
+                'num-dim': ndim
+            },
+            # 'MATPROP': {
+            #     'b-plane-strain': 1,
+            #     "young's-modulus": 100.0,
+            #     "poisson's-ratio": 0.3
+            # },
+            'NODE': {
+                'num-node': len(nodes),
+                'nodal-coord': [[float(n[0]), float(n[1])] for n in nodes]
+            },
+            'Element': {
+                'num-elem': len(elements),
+                'num-elem-node': 3,
+                'elem-conn': [[int(e[0]+1), int(e[1]+1), int(e[2]+1)] for e in elements]
+            }
+        }
+        
         with open(filename, 'w') as f:
-            f.write("*PARAMETER\n")
-            f.write("num-dim: 2\n")
-            f.write("*MATPROP\n")
-            f.write("b-plane-strain: 1\n")
-            f.write("young's-modulus: 100.0\n")
-            f.write("poisson's-ratio: 0.3\n")
-            f.write("*NODE\n")
-            f.write(f"num-node: {len(nodes)}\n")
-            f.write("nodal-coord:\n")
-            for node in nodes:
-                f.write(f"{node[0]} {node[1]}\n")
-            f.write("*ELEMENT\n")
-            f.write(f"num-elem: {len(elements)}\n")
-            f.write("num-elem-node: 3\n")
-            f.write("elem-conn:\n")
-            for elem in elements:
-                f.write(f"{elem[0]+1} {elem[1]+1} {elem[2]+1}\n")
+            yaml.dump(data, f, default_flow_style=None)

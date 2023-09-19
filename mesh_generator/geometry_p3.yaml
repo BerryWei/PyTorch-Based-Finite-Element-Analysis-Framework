@@ -1,0 +1,15 @@
+geometry:
+  boundary:
+    - [0.0, -30]
+    - [200.0, -30]
+    - [200.0, 30]
+    - [0.0, 30.]
+  holes:
+    # if no holes--> leave empty
+    - center: [100, 0]
+      radius: 12
+
+mesh:
+  area: 50
+
+num-dim: 2

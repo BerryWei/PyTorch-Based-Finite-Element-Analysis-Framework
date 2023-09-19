@@ -1,9 +1,10 @@
 # main.py
-
+from pathlib import Path
 from utlis import Geometry, MeshGenerator, Visualizer
 
 if __name__ == '__main__':
-    geometry_obj = Geometry('geometry.yaml')
+    path = Path('D:/finite_element_method/mesh_generator/geometry_p4.yaml')
+    geometry_obj = Geometry(path)
     mesh_gen = MeshGenerator(geometry_obj)
     if geometry_obj.holes:
         print("This geometry contains holes.")
@@ -15,5 +16,6 @@ if __name__ == '__main__':
     else:
         nodes, elements = mesh_gen.generate_simple_mesh()
 
-    mesh_gen.write_output_file('inp',nodes, elements)
-    Visualizer.plot_mesh(nodes, elements)
+    mesh_gen.write_output_file_yaml(filename='inp.yaml',nodes=nodes, elements=elements, ndim=geometry_obj.ndim)
+
+    Visualizer.visualize_mesh(nodes, elements)

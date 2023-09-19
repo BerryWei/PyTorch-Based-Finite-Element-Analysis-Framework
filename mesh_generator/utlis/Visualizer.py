@@ -3,9 +3,22 @@ import matplotlib.tri as mtri
 import numpy as np
 
 class Visualizer:
+    def __init__(self):
+        """
+        Initializes the Visualizer class.
+        """
+        pass
+
+
     @staticmethod
-    def plot_mesh(nodes, elements):
-        """Visualize the generated mesh."""
+    def visualize_mesh(nodes: np.ndarray, elements: np.ndarray) -> None:
+        """
+        Visualizes the generated mesh using matplotlib.
+
+        Args:
+            nodes (np.ndarray): A 2D array of node coordinates.
+            elements (np.ndarray): A 2D array of element connectivity.
+        """
         nodes = np.array(nodes)
         triang = mtri.Triangulation(nodes[:, 0], nodes[:, 1], elements)
 
@@ -25,8 +38,8 @@ class Visualizer:
             y_center = np.mean(nodes[triangle, 1])
             plt.text(x_center, y_center, '('+str(index+1)+')', ha='center', va='center', color='red', fontsize=7, weight='bold')
 
-        plt.title('Generated Mesh')
-        plt.xlabel('x')
-        plt.ylabel('y')
+        plt.title('Mesh Visualization')
+        plt.xlabel('X')
+        plt.ylabel('Y')
         plt.tight_layout()  # Ensures that labels and titles fit well within the plot
         plt.show()
