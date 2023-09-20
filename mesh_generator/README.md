@@ -51,7 +51,41 @@ num-dim: 2
 ```
 
 <div style="text-align: center">
-    <img src="./Problem1/mesh_config.png" alt="Sample GIF" width="600" height="480">
+    <img src="./Problem1/mesh_config.png" alt="Sample GIF" width="600*1.4" height="480*1.4">
+</div>
+
+### Example 2: Complex Polygon
+```yaml
+geometry:
+  boundary:
+    - [0.0, 21]
+    - [200, 21]
+    - [200, 0]
+    - [200, 31.]
+    - [450, 31]
+    - [450, 21]
+    - [650, 21]
+    - [650, -21]
+    - [450, -21]
+    - [450, 0]
+    - [450, -31]
+    - [200, -31]
+    - [200, -21]
+    - [0, -21]
+    
+  holes:
+    # if no holes--> leave empty
+    # - center: [0.5, 0.5]
+    #   radius: 0.3
+
+mesh:
+  area: 1000
+
+num-dim: 2
+```
+
+<div style="text-align: center">
+    <img src="./Problem2/mesh_config.png" alt="Sample GIF" width="600*1.5" height="480*1.5">
 </div>
 
 ### Example 3: Polygon with a Hole

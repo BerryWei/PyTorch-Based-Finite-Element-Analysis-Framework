@@ -1,12 +1,14 @@
 geometry:
   boundary:
+    - [0.0, 0.0]
     - [0.0, -30]
-    - [200.0, -30]
-    - [200.0, 30]
+    - [60.0, -30]
+    - [60.0, 0]
+    - [60.0, 30]
     - [0.0, 30.]
   holes:
     # if no holes--> leave empty
-    - center: [100, 0]
+    - center: [30, 0]
       radius: 12
 
 mesh:

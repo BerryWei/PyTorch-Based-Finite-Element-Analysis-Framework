@@ -1,0 +1,9 @@
+Boundary:
+  # node#-dof#-disp:
+  node_dof_disp:
+  - [1, 1, 0.0]
+  - [1, 2, 0.0]
+  - [4, 1, 0.0]
+  # elem#-face#-trac:
+  elem_face_trac:
+  - [2, 1, 10.0, 0.0]
