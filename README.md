@@ -20,7 +20,7 @@ Introducing a framework designed for Finite Element Analysis (FEA) with PyTorch 
 1. **Setup**: Craft nodes, elements, and material properties using the provided YAML templates in `geometry.yaml` and `material.yaml`.
 2. **Execution**:
 ```bash
-   python main.py --device cuda --inp_path geometry.yaml --material_path material.yaml --loading_path loading.yaml
+   python main.py --device cuda --geometry_path geometry.yaml --material_path material.yaml --loading_path loading.yaml
 ```
 
 ## Prerequisites
