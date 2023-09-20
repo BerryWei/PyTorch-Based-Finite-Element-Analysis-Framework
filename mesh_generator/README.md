@@ -7,6 +7,14 @@ This repository provides a set of Python tools for generating meshes suitable fo
 - **Visualization**: Visualize the generated mesh using `matplotlib`.
 - **Export Options**: Save the mesh data in YAML and MATLAB formats.
 
+## Mesh Construction
+
+The framework utilizes the [Triangle](https://www.cs.cmu.edu/~quake/triangle.html) library for mesh generation. Triangle is a robust implementation of the Delaunay triangulation and constrained Delaunay triangulation algorithms. 
+
+To construct the mesh, boundary vertices are first defined, and segments are created between consecutive vertices. The `triangle.triangulate()` function is then invoked with specific meshing options to produce the desired mesh. 
+
+For ensuring particular points, such as `(0,0)`, are included in the mesh vertices, they can be explicitly added to the boundary vertices before triangulation.
+
 ## Usage
 ### Setup
 1. Clone the repository to your local machine.
