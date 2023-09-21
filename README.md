@@ -116,6 +116,7 @@ if __name__ == "__main__":
 <div style="text-align: center">
     <img src="./strain_x.png" alt="Sample GIF" width="600" height="480">
 </div>
+
    - stress distribution
 <div style="text-align: center">
     <img src="./stress_x.png" alt="Sample GIF" width="600" height="480">
