@@ -8,7 +8,7 @@ from typing import Union, Dict, Any, Type, List, Callable
 from .material import * 
 from tqdm import tqdm
 from pathlib import Path
-import concurrent.futures
+
 
 class FiniteElementModel:
     def __init__(self, device: str='cuda') -> None:
@@ -50,21 +50,18 @@ class FiniteElementModel:
         dof_per_element = ElementClass.element_dof
         self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
 
-        def compute_element_stiffness(i):
+        for i in range(self.num_element):
             elem_nodes = self.element_node_indices[i]
             node_coords = self.node_coords[elem_nodes]
             area = 0.5 * abs(node_coords[0, 0] * (node_coords[1, 1] - node_coords[2, 1]) +
-                             node_coords[1, 0] * (node_coords[2, 1] - node_coords[0, 1]) +
-                             node_coords[2, 0] * (node_coords[0, 1] - node_coords[1, 1]))
+                            node_coords[1, 0] * (node_coords[2, 1] - node_coords[0, 1]) +
+                            node_coords[2, 0] * (node_coords[0, 1] - node_coords[1, 1]))
+            
             B_matrix = ElementClass.compute_B_matrix(node_coords, device=self.device)
             D_matrix = material.consistent_tangent(element_index=i)
             K = area * torch.einsum('ji,jk,kl->il', B_matrix, D_matrix, B_matrix)
-            return K
+            self.element_stiffnesses[i] = K
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = list(tqdm(executor.map(compute_element_stiffness, range(self.num_element)), total=self.num_element))
-
-        self.element_stiffnesses = torch.stack(results)
 
 
     def assemble_global_stiffness(self):
@@ -78,20 +75,20 @@ class FiniteElementModel:
         # Calculate the DOF indices for each dimension of each node in the elements
         dof_per_dimension = torch.arange(self.parameters['num_dimensions']).to(self.device).unsqueeze(0)  # [0,1], or[0,1,2]
         elemental_dof_indices = self.element_node_indices.unsqueeze(-1) * self.parameters['num_dimensions'] + dof_per_dimension  # Broadcasting
-        global_dof_indices = elemental_dof_indices.view(self.element_node_indices.shape[0], -1).int()
 
-        
+
         # Use advanced indexing to assemble all element stiffness matrices into the global stiffness matrix simultaneously
-        '''
+        n_dim = self.parameters['num_dimensions']
         for i, elem_nodes in enumerate(self.element_node_indices):
             # Determine the global degree of freedom indices for this element
-            global_dof_indices = torch.cat([2*elem_nodes, 2*elem_nodes+1]).int()
+            elem_dof_indices = torch.cat([(n_dim*elem_nodes).unsqueeze(-1), (n_dim*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).int()
             
             # Assemble the element stiffness matrix into the global stiffness matrix
-            self.global_stiffness[global_dof_indices[:, None], global_dof_indices] += self.element_stiffnesses[i]
-        '''
-        self.global_stiffness[global_dof_indices[:, :, None], global_dof_indices[:, None, :]] += self.element_stiffnesses
+            self.global_stiffness[elem_dof_indices[:, None], elem_dof_indices[None, :]] += self.element_stiffnesses[i]
 
+        #self.global_stiffness[global_dof_indices[:, :, None], global_dof_indices[:, None, :]] += self.element_stiffnesses
+
+        print()
 
     def read_geom_from_yaml(self, file_path: Path) -> None:
         """
@@ -328,24 +325,17 @@ class FiniteElementModel:
         import matplotlib.pyplot as plt
         import matplotlib.tri as mtri
 
+        x = self.node_coords[:, 0].cpu().numpy()
+        y = self.node_coords[:, 1].cpu().numpy()
+        triangles = self.element_node_indices.cpu().numpy()
+
         for func in funcs:
             values = func().cpu().numpy()
 
-            # Compute element centroids
-            centroids_x = []
-            centroids_y = []
-            for elem_nodes in self.element_node_indices:
-                node_coords = self.node_coords[elem_nodes]
-                centroid_x = torch.mean(node_coords[:, 0]).item()
-                centroid_y = torch.mean(node_coords[:, 1]).item()
-                centroids_x.append(centroid_x)
-                centroids_y.append(centroid_y)
-
-            # Plotting
             fig, ax = plt.subplots()
-            triangulation = mtri.Triangulation(centroids_x, centroids_y)
-            contour = ax.tricontourf(triangulation, values, levels=15)
-            plt.colorbar(contour)
+            tripcolor_plot = ax.tripcolor(x, y, triangles, facecolors=values, shading='flat', edgecolors='k')
+            plt.colorbar(tripcolor_plot)
             ax.set_aspect('equal', 'box')
             ax.set_title(func.__name__)
             plt.show()
+

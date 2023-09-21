@@ -49,8 +49,12 @@ def main(args):
     
     def elemental_stress_x():
         return model.elemental_stresses[:, 0]
+    
+
 
     model.plot([elemental_strain_x])
+
+    model.plot([elemental_stress_x])
 
 
 

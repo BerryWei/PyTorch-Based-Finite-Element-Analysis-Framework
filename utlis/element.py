@@ -49,30 +49,34 @@ class TriangularElement(BaseElement):
         if len(node_coords.shape) != 2 or node_coords.shape[0] != 3 or node_coords.shape[1] != 2:
             raise ValueError("node_coords shape should be (3, 2) for a single triangle")
 
-        dN_dxi = torch.tensor([-1, 1, 0], dtype=torch.float).to(device)
-        dN_deta = torch.tensor([-1, 0, 1], dtype=torch.float).to(device)
+        x1, y1 = node_coords[0]
+        x2, y2 = node_coords[1]
+        x3, y3 = node_coords[2]
 
-        J11 = node_coords[:, 0] @ dN_dxi
-        J12 = node_coords[:, 0] @ dN_deta
-        J21 = node_coords[:, 1] @ dN_dxi
-        J22 = node_coords[:, 1] @ dN_deta
+        # Compute the area of the triangle
+        A = 0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))
 
-        J = torch.tensor([[J11, J12], [J21, J22]]).to(device)
+        # Check if area is close to zero (degenerate triangle)
+        if abs(A) < 1e-10:
+            raise ValueError("The provided node coordinates result in a degenerate triangle with almost zero area.")
+        
+        # Derivatives of shape functions
+        b1 = (y2 - y3) / (2*A)
+        b2 = (y3 - y1) / (2*A)
+        b3 = (y1 - y2) / (2*A)
 
-        inv_J = torch.inverse(J)
+        c1 = (x3 - x2) / (2*A)
+        c2 = (x1 - x3) / (2*A)
+        c3 = (x2 - x1) / (2*A)
 
-        dN_dx = inv_J[0, 0] * dN_dxi + inv_J[0, 1] * dN_deta
-        dN_dy = inv_J[1, 0] * dN_dxi + inv_J[1, 1] * dN_deta
-
-        # B-matrix
-        B = torch.zeros((3, 6)).to(device)
-        B[0, 0::2] = dN_dx
-        B[1, 1::2] = dN_dy
-        B[2, 0::2] = dN_dy
-        B[2, 1::2] = dN_dx
+        # Construct the B-matrix
+        B = torch.tensor([
+            [b1, 0, b2, 0, b3, 0],
+            [0, c1, 0, c2, 0, c3],
+            [c1, b1, c2, b2, c3, b3]
+        ], dtype=torch.float).to(device)
 
         return B
-    
     
 # a = torch.tensor([1/3, 1/3])
 # print(TriangularElement.shape_functions(a))

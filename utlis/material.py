@@ -106,6 +106,7 @@ class Elasticity_2D(ConstitutiveLaw):
                 [0, 0, (1-mu)/2]
             ])
 
+
     def update_states(self, deps, stressN, alphaN, epN):
         r"""
         Update internal variables based on the provided incremental strain.
