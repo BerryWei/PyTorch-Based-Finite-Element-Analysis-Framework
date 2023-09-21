@@ -80,7 +80,7 @@ class TriangularElement(BaseElement):
 #     [0., 0],
 #     [1, 0],
 #     [0, 1]
-# ])
+# ]).to('cuda')
 
 # B_matrix = TriangularElement.compute_B_matrix(node_coords)
 # print(B_matrix)

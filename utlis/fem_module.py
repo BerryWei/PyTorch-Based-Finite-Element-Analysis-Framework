@@ -75,8 +75,11 @@ class FiniteElementModel:
         self.global_stiffness = torch.zeros(self.num_dofs, self.num_dofs, device=self.device)
         
         # Determine the global degree of freedom indices for all elements
-        global_dof_indices = torch.cat([self.parameters['num_dimensions']*self.element_node_indices, 
-                                        self.parameters['num_dimensions']*self.element_node_indices + 1], dim=1).int()
+        # Calculate the DOF indices for each dimension of each node in the elements
+        dof_per_dimension = torch.arange(self.parameters['num_dimensions']).to(self.device).unsqueeze(0)  # [0,1], or[0,1,2]
+        elemental_dof_indices = self.element_node_indices.unsqueeze(-1) * self.parameters['num_dimensions'] + dof_per_dimension  # Broadcasting
+        global_dof_indices = elemental_dof_indices.view(self.element_node_indices.shape[0], -1).int()
+
         
         # Use advanced indexing to assemble all element stiffness matrices into the global stiffness matrix simultaneously
         '''
@@ -247,6 +250,10 @@ class FiniteElementModel:
 
         # Solve the system
         u_sub = torch.linalg.solve(K_sub, R_sub.unsqueeze(1))
+        residual = R_sub - K_sub @ u_sub.squeeze()
+        relative_residual_error = torch.norm(residual) / torch.norm(R_sub)
+        print(f"Relative Residual Error: {relative_residual_error.item():.8f}")
+
 
 
         # Create a global displacement vector
@@ -274,7 +281,7 @@ class FiniteElementModel:
                 B_matrix = ElementClass.compute_B_matrix(node_coords, device=self.device)
 
                 # elem_nodes = [n1, n2, n3]--> elem_dof_indices = [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n3, 2*n3+1]
-                elem_dof_indices = torch.cat([(2*elem_nodes).unsqueeze(-1), (2*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).int()
+                elem_dof_indices = torch.cat([(self.parameters['num_dimensions']*elem_nodes).unsqueeze(-1), (self.parameters['num_dimensions']*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).int()
                 elem_displacements = self.global_displacements[elem_dof_indices]
                 strains = B_matrix @ elem_displacements
                 stresses = self.material.consistent_tangent(element_index = i) @ strains
@@ -290,23 +297,23 @@ class FiniteElementModel:
                 file.write("node#-u1-u2:\n")
                 for i, node_coord in enumerate(self.node_coords):
                     disp = self.global_displacements[i*2:i*2+2]
-                    file.write(f"{i} {disp[0]:.3f} {disp[1]:.3f}\n")
+                    file.write(f"{i} {disp[0]:.7f} {disp[1]:.7f}\n")
                 
                 file.write("*ELEMENT\n")
                 file.write("elem#-e11-e22-e12-s11-s22-s12\n")
                 for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {strain[0]:.3f} {strain[1]:.3f} {strain[2]:.3f} {stress[0]:.3f} {stress[1]:.3f} {stress[2]:.3f}\n")
+                    file.write(f"{i} {strain[0]:.7f} {strain[1]:.7f} {strain[2]:.7f} {stress[0]:.7f} {stress[1]:.7f} {stress[2]:.7f}\n")
             
             elif self.parameters['num_dimensions'] == 3:
                 file.write("node#-u1-u2-u3:\n")
                 for i, node_coord in enumerate(self.node_coords):
                     disp = self.global_displacements[i*3:i*3+3]
-                    file.write(f"{i} {disp[0]:.3f} {disp[1]:.3f} {disp[2]:.3f}\n")
+                    file.write(f"{i} {disp[0]:.7f} {disp[1]:.7f} {disp[2]:.7f}\n")
                 
                 file.write("*ELEMENT\n")
                 file.write("elem#-e11-e22-e33-e23-e13-e12-s11-s22-s33-s23-s13-s12\n")
                 for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {' '.join([f'{val:.3f}' for val in strain])} {' '.join([f'{val:.3f}' for val in stress])}\n")
+                    file.write(f"{i} {' '.join([f'{val:.7f}' for val in strain])} {' '.join([f'{val:.7f}' for val in stress])}\n")
             
             else:
                 raise ValueError(f"Unsupported number of dimensions: {self.parameters['num_dimensions']}")
