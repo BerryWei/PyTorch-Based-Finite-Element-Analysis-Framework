@@ -30,13 +30,13 @@ class Visualizer:
 
         # Labeling the nodes
         for index, (x, y) in enumerate(nodes):
-            plt.text(x, y, str(index+1), ha='center', va='center', color='blue', fontsize=9, weight='bold')
+            plt.text(x, y, str(index), ha='center', va='center', color='blue', fontsize=9, weight='bold')
 
         # Labeling the elements
         for index, triangle in enumerate(elements):
             x_center = np.mean(nodes[triangle, 0])
             y_center = np.mean(nodes[triangle, 1])
-            plt.text(x_center, y_center, '('+str(index+1)+')', ha='center', va='center', color='red', fontsize=7, weight='bold')
+            plt.text(x_center, y_center, '('+str(index)+')', ha='center', va='center', color='red', fontsize=7, weight='bold')
 
         plt.title('Mesh Visualization')
         plt.xlabel('X')

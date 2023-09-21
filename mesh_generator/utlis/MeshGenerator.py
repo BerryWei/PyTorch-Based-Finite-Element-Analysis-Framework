@@ -114,9 +114,10 @@ class MeshGenerator:
                 'nodal-coord': [[float(n[0]), float(n[1])] for n in nodes]
             },
             'Element': {
+                'type': 'TriangularElement',
                 'num-elem': len(elements),
                 'num-elem-node': 3,
-                'elem-conn': [[int(e[0]+1), int(e[1]+1), int(e[2]+1)] for e in elements]
+                'elem-conn': [[int(e[0]), int(e[1]), int(e[2])] for e in elements]
             }
         }
         

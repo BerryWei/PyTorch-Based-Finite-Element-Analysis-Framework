@@ -16,6 +16,6 @@ if __name__ == '__main__':
     else:
         nodes, elements = mesh_gen.generate_simple_mesh()
 
-    mesh_gen.write_output_file_yaml(filename='inp.yaml',nodes=nodes, elements=elements, ndim=geometry_obj.ndim)
+    mesh_gen.write_output_file_yaml(filename='geometry.yaml',nodes=nodes, elements=elements, ndim=geometry_obj.ndim)
 
     Visualizer.visualize_mesh(nodes, elements)

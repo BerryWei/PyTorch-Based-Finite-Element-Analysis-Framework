@@ -122,7 +122,7 @@ class Elasticity_2D(ConstitutiveLaw):
         stress = stressN + self.stiffMat2d @ deps
         return (stress, alphaN, epN)
 
-    def consistent_tangent(self, deps=None, stressN=None, alphaN=None, epN=None):
+    def consistent_tangent(self, element_index = None, deps=None, stressN=None, alphaN=None, epN=None):
         r"""
         Return consistent tangent (stiffness matrix) for the current state.
 
