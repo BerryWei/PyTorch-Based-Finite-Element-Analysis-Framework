@@ -146,3 +146,33 @@ class Elasticity_2D(ConstitutiveLaw):
         - device (Union[str, torch.device]): The target device, e.g., "cuda" or "cpu".
         """
         self.stiffMat2d = self.stiffMat2d.to(device)
+
+    def consistent_tangent_vectorized(self, num_elements=None, deps=None, stressN=None, alphaN=None, epN=None):
+        r"""
+        Return consistent tangent (stiffness matrix) for the current state in a vectorized manner.
+
+        Parameters:
+        - num_elements (int, optional): Number of elements for which the tangent is needed. Only required if other parameters are None.
+        - deps (torch.Tensor, optional): Incremental strain for each element. Shape: (num_elements, ...). Defaults to None.
+        - stressN (torch.Tensor, optional): Stress from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
+        - alphaN (torch.Tensor, optional): Back-stress from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
+        - epN (torch.Tensor, optional): Effective plastic strain from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
+
+        Returns:
+        - torch.Tensor: Consistent tangent (stiffness matrix) for each element. Shape: (num_elements, ...).
+        """
+        
+        if num_elements is None:
+            if deps is not None:
+                num_elements = deps.shape[0]
+            elif stressN is not None:
+                num_elements = stressN.shape[0]
+            elif alphaN is not None:
+                num_elements = alphaN.shape[0]
+            elif epN is not None:
+                num_elements = epN.shape[0]
+            else:
+                raise ValueError("Either provide num_elements or one of the other parameters to infer the batch size.")
+        
+        # Reshape the stiffMat2d to handle batch of elements
+        return self.stiffMat2d.unsqueeze(0).repeat(num_elements, 1, 1)

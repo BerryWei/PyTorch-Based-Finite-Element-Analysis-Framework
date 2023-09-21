@@ -62,6 +62,33 @@ class FiniteElementModel:
             K = area * torch.einsum('ji,jk,kl->il', B_matrix, D_matrix, B_matrix)
             self.element_stiffnesses[i] = K
 
+    def compute_element_stiffness_vectorize(self, material: Material, ElementClass: Type[BaseElement]) -> None:
+            
+        dof_per_element = ElementClass.element_dof
+        self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
+
+        # Get all node coordinates for all elements at once
+        all_node_coords = self.node_coords[self.element_node_indices]
+
+        # Compute areas for all elements
+        areas = 0.5 * torch.abs(
+            all_node_coords[:, 0, 0] * (all_node_coords[:, 1, 1] - all_node_coords[:, 2, 1]) +
+            all_node_coords[:, 1, 0] * (all_node_coords[:, 2, 1] - all_node_coords[:, 0, 1]) +
+            all_node_coords[:, 2, 0] * (all_node_coords[:, 0, 1] - all_node_coords[:, 1, 1])
+        )
+
+        # Compute B_matrix for all elements
+        B_matrices = ElementClass.compute_B_matrix_vectorized(all_node_coords, device=self.device) # (num_element, 3, dof_per_element)
+
+        # Compute D_matrix for all elements
+        D_matrices = material.consistent_tangent_vectorized(num_elements=self.num_element) # (num_element, 3, 3)
+
+        # Compute K for all elements
+        K_matrices = areas[:, None, None] * torch.einsum('bji,bjk,bkl->bil', B_matrices, D_matrices, B_matrices)
+
+        self.element_stiffnesses = K_matrices
+
+
 
 
     def assemble_global_stiffness(self):
@@ -88,7 +115,6 @@ class FiniteElementModel:
 
         #self.global_stiffness[global_dof_indices[:, :, None], global_dof_indices[:, None, :]] += self.element_stiffnesses
 
-        print()
 
     def read_geom_from_yaml(self, file_path: Path) -> None:
         """
