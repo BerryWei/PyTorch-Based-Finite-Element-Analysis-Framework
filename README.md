@@ -48,7 +48,6 @@ import argparse
 import time
 import logging
 
-    start_time = time.time()
 def get_loggings(ckpt_dir: Path):
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     
