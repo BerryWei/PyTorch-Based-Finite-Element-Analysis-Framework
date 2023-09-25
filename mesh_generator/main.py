@@ -3,7 +3,7 @@ from pathlib import Path
 from utlis import Geometry, MeshGenerator, Visualizer
 
 if __name__ == '__main__':
-    path = Path('D:/finite_element_method/mesh_generator/geometry_p3.yaml')
+    path = Path('D:/finite_element_method/mesh_generator/geometry_p4.yaml')
     geometry_obj = Geometry(path)
     mesh_gen = MeshGenerator(geometry_obj)
     if geometry_obj.holes:

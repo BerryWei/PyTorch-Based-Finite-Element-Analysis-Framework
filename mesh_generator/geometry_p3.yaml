@@ -12,6 +12,6 @@ geometry:
       radius: 12
 
 mesh:
-  area: 1
+  area: 20
 
 num-dim: 2
