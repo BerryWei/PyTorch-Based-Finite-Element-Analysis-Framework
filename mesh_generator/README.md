@@ -24,7 +24,7 @@ For ensuring particular points, such as `(0,0)`, are included in the mesh vertic
 ### Execution
 Run the `main.py` script:
 ```bash
-python main.py
+python main.py --input INPUT.YAML --output OUTPUT.YAML
 ```
 
 
