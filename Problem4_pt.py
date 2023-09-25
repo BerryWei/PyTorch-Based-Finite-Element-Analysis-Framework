@@ -37,14 +37,15 @@ import matplotlib.pyplot as plt
 # cal theta
 
 sin_t = 1/R*(b/2 -c/2 -R)
-theda = np.arcsin(1/R*(b/2 -c/2 -R))
+theda = 0
 cos_t = np.sqrt(1 - (-R + b/2 - c/2)**2/R**2)
 # Compute the circle's center
-center_x = R * cos_t
+center_x = R 
 center_y = R + c/2
 # Compute points on the circle
 theta = np.linspace(np.pi+np.pi/2,  np.pi+np.pi/2-(np.pi/2+theda), 10)
 theta = np.linspace(np.pi+np.pi/2-(np.pi/2+theda), np.pi+np.pi/2, 10)
+
 x_circle = center_x + R * np.cos(theta)
 y_circle = center_y + R * np.sin(theta)
 
@@ -59,16 +60,19 @@ outputlist = []
 
 outputlist.append([-a, -b/2])
 outputlist.append([-a, b/2])
+outputlist.append([0, b/2])
 
 for x,y in zip(x_circle,y_circle):
     outputlist.append([x,y])
 #####################################################
 
 # Compute the circle's center
-center_x = R * cos_t
+center_x = R
 center_y = -R - c/2
 # Compute points on the circle
 theta = np.linspace(np.pi/2,  np.pi/2+(np.pi/2+theda), 10)
+#theta = np.linspace(np.pi/2+(np.pi/2+theda),  np.pi/2, 10)
+
 x_circle = center_x + R * np.cos(theta)
 y_circle = center_y + R * np.sin(theta)
 
@@ -83,7 +87,7 @@ outputlist.append([d, -c/2])
 for x,y in zip(x_circle,y_circle):
     outputlist.append([x,y])
 
-
+outputlist.append([0, -b/2])
 
 
 
