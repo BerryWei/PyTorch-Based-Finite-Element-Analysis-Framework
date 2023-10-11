@@ -44,7 +44,7 @@ class TriangularElement(BaseElement):
         return N
     
     @staticmethod
-    def compute_B_matrix(node_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+    def compute_B_matrix_legacy(node_coords: torch.Tensor, device='cuda') -> torch.Tensor:
         # Checking the input shape
         if len(node_coords.shape) != 2 or node_coords.shape[0] != 3 or node_coords.shape[1] != 2:
             raise ValueError("node_coords shape should be (3, 2) for a single triangle")
@@ -77,6 +77,38 @@ class TriangularElement(BaseElement):
         ], dtype=torch.float).to(device)
 
         return B
+    
+    @staticmethod
+    def compute_B_matrix(node_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        # Checking the input shape
+        if len(node_coords.shape) != 2 or node_coords.shape[0] != 3 or node_coords.shape[1] != 2:
+            raise ValueError("node_coords shape should be (3, 2) for a single triangle")
+
+
+        x1, y1 = node_coords[0]
+        x2, y2 = node_coords[1]
+        x3, y3 = node_coords[2]
+
+        # Compute the area of the triangle (2A for convenience in the formula)
+        two_A = (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
+
+        # Compute derivatives of shape functions
+        dN1_dx = (y2 - y3) / ((y1-y2)*(x3-x2)-(x1-x2)*(y3-y2))
+        dN2_dx = (y3 - y1) / ((y2-y3)*(x1-x3)-(x2-x3)*(y1-y3))
+        dN3_dx = (y1 - y2) / ((y3-y1)*(x2-x1)-(x3-x1)*(y2-y1))
+
+        dN1_dy = (x3 - x2) / ((y1-y2)*(x3-x2)-(x1-x2)*(y3-y2))
+        dN2_dy = (x1 - x3) / ((y2-y3)*(x1-x3)-(x2-x3)*(y1-y3))
+        dN3_dy = (x2 - x1) / ((y3-y1)*(x2-x1)-(x3-x1)*(y2-y1))
+
+        # Construct the B matrix
+        B = torch.tensor([[dN1_dx, 0, dN2_dx, 0, dN3_dx, 0],
+                        [0, dN1_dy, 0, dN2_dy, 0, dN3_dy],
+                        [dN1_dy, dN1_dx, dN2_dy, dN2_dx, dN3_dy, dN3_dx]], device=device, dtype=torch.float)
+
+        return B
+
+
 
     @staticmethod
     def compute_B_matrix_vectorized(node_coords: torch.Tensor, device='cuda') -> torch.Tensor:

@@ -83,7 +83,7 @@ class MeshGenerator:
         
         meshing_options = 'pq30'
 
-        meshing_options += f'a{self.geometry.area}'
+        meshing_options += f'a{self.geometry.area:f}'
         
         mesh = triangle.triangulate(poly, meshing_options)
         

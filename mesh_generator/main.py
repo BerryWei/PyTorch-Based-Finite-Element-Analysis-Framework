@@ -8,7 +8,7 @@ from utlis.Visualizer import Visualizer
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Mesh Generation from Geometry YAML.")
-    parser.add_argument('--input', type=str, default='D:/finite_element_method/mesh_generator/geometry_p4.yaml', 
+    parser.add_argument('--input', type=str, default='D:/finite_element_method/mesh_generator/geometry_p2.yaml', 
                         help='Path to the input YAML file containing geometry information.')
     parser.add_argument('--output', type=str, default='geometry.yaml', 
                         help='Name of the output YAML file to store generated mesh data.')

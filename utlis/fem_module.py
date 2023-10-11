@@ -108,7 +108,7 @@ class FiniteElementModel:
         n_dim = self.parameters['num_dimensions']
         for i, elem_nodes in enumerate(self.element_node_indices):
             # Determine the global degree of freedom indices for this element
-            elem_dof_indices = torch.cat([(n_dim*elem_nodes).unsqueeze(-1), (n_dim*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).int()
+            elem_dof_indices = torch.cat([(n_dim*elem_nodes).unsqueeze(-1), (n_dim*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).long()
             
             # Assemble the element stiffness matrix into the global stiffness matrix
             self.global_stiffness[elem_dof_indices[:, None], elem_dof_indices[None, :]] += self.element_stiffnesses[i]
@@ -287,6 +287,11 @@ class FiniteElementModel:
         if self.node_dof_disp.numel() > 0:
             self.global_displacements[known_dof_indices] = self.node_dof_disp[:, 2]
 
+        print('test')
+
+
+
+
 
     def compute_elemental_strains_stresses(self, ElementClass: Type[BaseElement]) -> None:
             """Compute strains and stresses for each element."""
@@ -304,7 +309,7 @@ class FiniteElementModel:
                 B_matrix = ElementClass.compute_B_matrix(node_coords, device=self.device)
 
                 # elem_nodes = [n1, n2, n3]--> elem_dof_indices = [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n3, 2*n3+1]
-                elem_dof_indices = torch.cat([(self.parameters['num_dimensions']*elem_nodes).unsqueeze(-1), (self.parameters['num_dimensions']*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).int()
+                elem_dof_indices = torch.cat([(self.parameters['num_dimensions']*elem_nodes).unsqueeze(-1), (self.parameters['num_dimensions']*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).long()
                 elem_displacements = self.global_displacements[elem_dof_indices]
                 strains = B_matrix @ elem_displacements
                 stresses = self.material.consistent_tangent(element_index = i) @ strains
@@ -320,23 +325,23 @@ class FiniteElementModel:
                 file.write("node#-u1-u2:\n")
                 for i, node_coord in enumerate(self.node_coords):
                     disp = self.global_displacements[i*2:i*2+2]
-                    file.write(f"{i} {disp[0]:.7f} {disp[1]:.7f}\n")
+                    file.write(f"{i} {disp[0]:.12f} {disp[1]:.12f}\n")
                 
                 file.write("*ELEMENT\n")
                 file.write("elem#-e11-e22-e12-s11-s22-s12\n")
                 for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {strain[0]:.7f} {strain[1]:.7f} {strain[2]:.7f} {stress[0]:.7f} {stress[1]:.7f} {stress[2]:.7f}\n")
+                    file.write(f"{i} {strain[0]:.12f} {strain[1]:.12f} {strain[2]:.12f} {stress[0]:.12f} {stress[1]:.12f} {stress[2]:.12f}\n")
             
             elif self.parameters['num_dimensions'] == 3:
                 file.write("node#-u1-u2-u3:\n")
                 for i, node_coord in enumerate(self.node_coords):
                     disp = self.global_displacements[i*3:i*3+3]
-                    file.write(f"{i} {disp[0]:.7f} {disp[1]:.7f} {disp[2]:.7f}\n")
+                    file.write(f"{i} {disp[0]:.12f} {disp[1]:.12f} {disp[2]:.12f}\n")
                 
                 file.write("*ELEMENT\n")
                 file.write("elem#-e11-e22-e33-e23-e13-e12-s11-s22-s33-s23-s13-s12\n")
                 for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {' '.join([f'{val:.7f}' for val in strain])} {' '.join([f'{val:.7f}' for val in stress])}\n")
+                    file.write(f"{i} {' '.join([f'{val:.12f}' for val in strain])} {' '.join([f'{val:.12f}' for val in stress])}\n")
             
             else:
                 raise ValueError(f"Unsupported number of dimensions: {self.parameters['num_dimensions']}")
@@ -364,4 +369,25 @@ class FiniteElementModel:
             ax.set_aspect('equal', 'box')
             ax.set_title(func.__name__)
             plt.show()
+    @staticmethod
+    def node_indices_in_x_range(node_coords, x_range):
+        lower_bound, upper_bound = x_range
+        selected_indices = [idx for idx, coord in enumerate(node_coords) if lower_bound <= coord[0] <= upper_bound]
+        return selected_indices
+    
+    @staticmethod
+    def element_indices_in_x_range(element_node_indices, node_coords, x_range):
+        lower_bound, upper_bound = x_range
 
+        # Check if any node of an element is in the given x_range
+        def is_element_in_range(element):
+            for node_index in element:
+                # Ensure that node_index is valid before using it
+                if node_index is not None:
+                    
+                    if lower_bound <= node_coords[node_index][0] <= upper_bound:
+                        return True
+            return False
+
+        selected_element_indices = [idx for idx, element in enumerate(element_node_indices) if is_element_in_range(element)]
+        return selected_element_indices
