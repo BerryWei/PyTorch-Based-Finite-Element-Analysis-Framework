@@ -169,7 +169,8 @@ class FiniteElementModel:
             for traction_data in self.elem_face_trac:
                 elem_idx, face_idx = traction_data[:2]
                 traction_values = traction_data[2:]
-                elem_idx = elem_idx.long()  # Convert to long type
+                elem_idx = elem_idx.long()  
+
                 # Get the element's node indices for the specified face
                 face_nodes = ElementClass.boundary_nodes(face_idx)
                 elem_nodes = self.element_node_indices[elem_idx]
@@ -180,17 +181,13 @@ class FiniteElementModel:
 
 
                 # Get Gauss points and weights for the face
-                gauss_points, weights = ElementClass.face_gauss_points_and_weights(face_idx)
+                gauss_points, weights = ElementClass.face_gauss_points_and_weights(face_idx, node_coords)
 
                 for gp, w in zip(gauss_points, weights):
-                    
-                    jacobian = ElementClass.compute_face_jacobian(node_coords)
-
-                    # For 2D: jacobian is essentially the length of the edge
                     for i, node in enumerate(nodes):
                         global_dof_index = node * self.parameters['num_dimensions']
                         for dim in range(self.parameters['num_dimensions']):
-                            self.global_load[global_dof_index + dim] += traction_values[dim] * w * jacobian
+                            self.global_load[global_dof_index + dim] += traction_values[dim] * w
 
     def read_material_from_yaml(self, file_path: Path):
         """

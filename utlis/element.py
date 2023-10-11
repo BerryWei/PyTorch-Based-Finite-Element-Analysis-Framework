@@ -163,10 +163,14 @@ class TriangularElement(BaseElement):
 
     
     @staticmethod
-    def face_gauss_points_and_weights(face_idx: int) -> Tuple[List[Tuple[float]], List[float]]:
+    def face_gauss_points_and_weights(face_idx: int, node_coords: torch.Tensor) -> Tuple[List[Tuple[float]], List[float]]:
         """Return the Gauss points and weights for a face (edge) of the element."""
+        # Compute the half length of the edge
+        node1, node2 = node_coords
+        half_length = 0.5 * torch.norm(node2 - node1).item()
         # For 2D edge integration, using 2 Gauss points as example
-        return [(-1/np.sqrt(3),), (1/np.sqrt(3),)], [1.0, 1.0]
+        return [(-1/np.sqrt(3),), (1/np.sqrt(3),)], [half_length, half_length]
+
     
     @staticmethod
     def compute_face_jacobian(node_coords: torch.Tensor) -> float:
