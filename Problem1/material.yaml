@@ -1,5 +1,5 @@
 MODEL: "Elasticity_2D"
 MATPROP:
-  is_plane_strain: 1
-  E: 100.0 
+  is_plane_strain: 0
+  E: 30.e+6 
   mu: 0.3

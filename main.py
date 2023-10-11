@@ -95,9 +95,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\david_hw2\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\david_hw2\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\david_hw2\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\Problem3_1\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\Problem3_1\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\Problem3_1\loading.yaml', help='Path to the loading.yaml file.')
 
     args = parser.parse_args()
     main(args)

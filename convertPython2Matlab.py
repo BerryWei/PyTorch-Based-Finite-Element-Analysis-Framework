@@ -1,7 +1,7 @@
 import yaml
 
 # Load the YAML file
-with open("./Problem2/geometry.yaml", 'r') as file:
+with open("./Problem2_3layer/geometry.yaml", 'r') as file:
     data = yaml.safe_load(file)
 
 # Convert the data from YAML to hw1-1 format
@@ -18,7 +18,7 @@ if "PARAMETER" in data:
 if "NODE" in data:
     output_content += "*NODE\n"
     output_content += f"num-node: {data['NODE']['num-node']}\n"
-    output_content += f"num-dof: 2\n"
+    output_content += f"nodal-coord:\n"
     for coord in data['NODE']['nodal-coord']:
         output_content += " ".join(map(str, coord)) + "\n"
     

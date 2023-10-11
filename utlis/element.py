@@ -1,5 +1,7 @@
 import torch
 from abc import ABC, abstractmethod
+from typing import List, Tuple
+import numpy as np
 
 class BaseElement(ABC):
     element_dof = None  
@@ -144,6 +146,45 @@ class TriangularElement(BaseElement):
         ], dim=1).to(device)
 
         return B
+    
+    @staticmethod
+    def boundary_nodes(face_idx: int) -> List[int]:
+        """Return the nodes of a boundary (edge) of the element."""
+        # Here, the boundaries are the edges for a triangle
+        # This might be different for other elements (like quads or tetrahedrons)
+        if face_idx == 0:
+            return [0, 1]
+        elif face_idx == 1:
+            return [1, 2]
+        elif face_idx == 2:
+            return [2, 0]
+        else:
+            raise ValueError("Invalid face index for a triangle.")
+
+    
+    @staticmethod
+    def face_gauss_points_and_weights(face_idx: int) -> Tuple[List[Tuple[float]], List[float]]:
+        """Return the Gauss points and weights for a face (edge) of the element."""
+        # For 2D edge integration, using 2 Gauss points as example
+        return [(-1/np.sqrt(3),), (1/np.sqrt(3),)], [1.0, 1.0]
+    
+    @staticmethod
+    def compute_face_jacobian(node_coords: torch.Tensor) -> float:
+        """Compute the Jacobian for a face (edge) of the element."""
+        # For the 2D triangular element, this is essentially the length of the edge
+        node1, node2 = node_coords
+        length = torch.norm(node2 - node1).item()
+        return length
+    
+    @staticmethod
+    def boundary_shape_functions(gp: float, device='cuda') -> torch.Tensor:
+        """Return the shape functions for the boundary (1D) for the given Gauss point."""
+        N = torch.tensor([0.5 * (1 - gp[0]), 0.5 * (1 + gp[0])]).to(device)
+
+        return N
+
+
+
 
     
 # a = torch.tensor([1/3, 1/3])

@@ -23,7 +23,7 @@ Boundary:
   - [12, 1, 0]
   # elem#-face#-trac:
   elem_face_trac:
-  - [0 ,1 ,2]
+  - []
   node_dof_forces:
   - [4, 0, 25500.0]
   - [14, 0, -17000.0]
