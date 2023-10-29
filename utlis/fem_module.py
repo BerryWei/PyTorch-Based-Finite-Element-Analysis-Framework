@@ -8,7 +8,7 @@ from typing import Union, Dict, Any, Type, List, Callable
 from .material import * 
 from tqdm import tqdm
 from pathlib import Path
-
+from .gaussQuadrature import GaussQuadrature
 
 class FiniteElementModel:
     def __init__(self, device: str='cuda') -> None:
@@ -48,19 +48,28 @@ class FiniteElementModel:
     def compute_element_stiffness(self, material: Material, ElementClass: Type[BaseElement]) -> None:
         
         dof_per_element = ElementClass.element_dof
+        n_dim = self.parameters['num_dimensions']
         self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
+
+        gauss_quadrature = GaussQuadrature(ElementClass.node_per_element, n_dim)
+        gauss_points, weights = gauss_quadrature.get_points_and_weights()
 
         for i in range(self.num_element):
             elem_nodes = self.element_node_indices[i]
             node_coords = self.node_coords[elem_nodes]
-            area = 0.5 * abs(node_coords[0, 0] * (node_coords[1, 1] - node_coords[2, 1]) +
-                            node_coords[1, 0] * (node_coords[2, 1] - node_coords[0, 1]) +
-                            node_coords[2, 0] * (node_coords[0, 1] - node_coords[1, 1]))
-            
-            B_matrix = ElementClass.compute_B_matrix(node_coords, device=self.device)
-            D_matrix = material.consistent_tangent(element_index=i)
-            K = area * torch.einsum('ji,jk,kl->il', B_matrix, D_matrix, B_matrix)
-            self.element_stiffnesses[i] = K
+
+            K_elem = torch.zeros(dof_per_element, dof_per_element, device=self.device)
+            for gauss_point, weight in zip(gauss_points, weights):
+                N, dN_dxi = ElementClass.shape_functions(gauss_point, device=self.device)
+                J = ElementClass.jacobian(node_coords, dN_dxi, device=self.device)
+                detJ = torch.det(J)
+                
+                B_matrix = ElementClass.compute_B_matrix(dN_dxi, J, device=self.device)
+                D_matrix = material.consistent_tangent(element_index=i)
+
+                K_elem += weight * detJ * torch.einsum('ji,jk,kl->il', B_matrix, D_matrix, B_matrix)
+            self.element_stiffnesses[i] = K_elem
+
 
     def compute_element_stiffness_vectorize(self, material: Material, ElementClass: Type[BaseElement]) -> None:
             
@@ -327,7 +336,16 @@ class FiniteElementModel:
 
             for i, elem_nodes in enumerate(self.element_node_indices):
                 node_coords = self.node_coords[elem_nodes]
-                B_matrix = ElementClass.compute_B_matrix(node_coords, device=self.device)
+
+                # Assuming a single Gauss point for simplicity
+                gauss_point = torch.tensor([1/3, 1/3], device=self.device)
+
+                # Compute shape function derivatives and Jacobian
+                _, dN_dxi = ElementClass.shape_functions(gauss_point, device=self.device)
+                J = ElementClass.jacobian(node_coords, dN_dxi, device=self.device)
+                
+                # Compute B_matrix
+                B_matrix = ElementClass.compute_B_matrix(dN_dxi, J, device=self.device)
 
                 # elem_nodes = [n1, n2, n3]--> elem_dof_indices = [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n3, 2*n3+1]
                 elem_dof_indices = torch.cat([(self.parameters['num_dimensions']*elem_nodes).unsqueeze(-1), (self.parameters['num_dimensions']*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).long()

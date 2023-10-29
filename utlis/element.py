@@ -42,9 +42,25 @@ class TriangularElement(BaseElement):
     @staticmethod
     def shape_functions(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
         xi, eta = natural_coords
-        N = torch.tensor([1 - xi - eta, xi, eta]).to(device)
+        N = torch.tensor([xi, eta, 1 - xi - eta]).to(device)
         return N
     
+    @staticmethod
+    def shape_function_derivatives(device='cuda') -> torch.Tensor:
+        ''' 2*3 tensor
+        [dN1/d_xi, dN2/d_xi, dN3/d_xi],
+        [dN1/d_eta, dN2/d_eta, dN3/d_eta],
+        
+        '''
+        # Derivatives of N with respect to xi and eta
+        dN_dxi = torch.tensor([1, 0, -1], device=device)
+        dN_deta = torch.tensor([0, 1, -1], device=device)
+        
+        # Combine them into a single tensor for convenience
+        dN = torch.stack((dN_dxi, dN_deta), dim=0)
+        
+        return dN
+
     @staticmethod
     def compute_B_matrix_legacy(node_coords: torch.Tensor, device='cuda') -> torch.Tensor:
         # Checking the input shape
@@ -201,3 +217,45 @@ class TriangularElement(BaseElement):
 
 # B_matrix = TriangularElement.compute_B_matrix(node_coords)
 # print(B_matrix)
+
+class T3Element(TriangularElement):
+    element_dof = 6  # 2 DOFs (u, v) for each of the 3 nodes
+    node_per_element = 3  # Number of nodes for T3 element
+    dimension = 2  # 2D element
+
+    @staticmethod
+    def shape_functions(gauss_point, device):
+        xi, eta = gauss_point
+        N = torch.tensor([
+            1 - xi - eta,
+            xi,
+            eta
+        ], dtype=torch.float, device=device)
+        
+        dN_dxi = torch.tensor([
+            [-1, 1, 0],
+            [-1, 0, 1]
+        ], dtype=torch.float, device=device)
+        
+        return N, dN_dxi
+
+    @staticmethod
+    def jacobian(node_coords, dN_dxi, device):
+        J = torch.mm(dN_dxi, node_coords)
+        detJ = torch.det(J)
+        if detJ == 0:
+            raise ValueError("The Jacobian is singular")
+        return J
+
+    @staticmethod
+    def compute_B_matrix(dN_dxi, J, device):
+        inv_J = torch.inverse(J)
+        dN_dxy = torch.mm(inv_J, dN_dxi)
+        
+        B = torch.zeros(3, 6, device=device)  # 3x6 for plane stress or plane strain
+        B[0, 0::2] = dN_dxy[0, :]
+        B[1, 1::2] = dN_dxy[1, :]
+        B[2, 0::2] = dN_dxy[1, :]
+        B[2, 1::2] = dN_dxy[0, :]
+        
+        return B

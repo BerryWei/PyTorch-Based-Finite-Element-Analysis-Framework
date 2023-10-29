@@ -24,6 +24,6 @@ geometry:
       radius: 5.e-2
 
 mesh:
-  area: 0.1
+  area: 0.01
 
 num-dim: 2

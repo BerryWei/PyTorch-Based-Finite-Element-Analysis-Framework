@@ -56,8 +56,8 @@ def run_analysis(model, ElementClass):
     start_time = time.time()
     
     logger.info("Computing the element stiffness...")
-    #model.compute_element_stiffness(material=model.material, ElementClass=ElementClass)
-    model.compute_element_stiffness_vectorize(material=model.material, ElementClass=ElementClass)
+    model.compute_element_stiffness(material=model.material, ElementClass=ElementClass)
+    #model.compute_element_stiffness_vectorize(material=model.material, ElementClass=ElementClass)
     logger.info("Assembling the element stiffness...")
     model.assemble_global_stiffness()
     model.assemble_global_load_vector(ElementClass=ElementClass)
@@ -83,7 +83,7 @@ def post_processing(model, ElementClass):
         return model.elemental_stresses[:, 0]
 
     model.plot([elemental_strain_x])
-    # model.plot([elemental_stress_x])
+    model.plot([elemental_stress_x])
 
 
 def main(args):
@@ -95,9 +95,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\Problem3_1\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\Problem3_1\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\Problem3_1\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\Problem3\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\Problem3\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\Problem3\loading.yaml', help='Path to the loading.yaml file.')
 
     args = parser.parse_args()
     main(args)
