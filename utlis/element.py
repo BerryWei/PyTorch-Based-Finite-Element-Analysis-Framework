@@ -259,3 +259,103 @@ class T3Element(TriangularElement):
         B[2, 1::2] = dN_dxy[0, :]
         
         return B
+    
+class QuadElement(BaseElement):
+    element_dof = 8  # 2 DOFs (u, v) for each of the 4 nodes
+    node_per_element = 4  # Number of nodes for Q4 element
+    dimension = 2  # 2D element
+
+    @staticmethod
+    def shape_functions(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coords
+        N = torch.tensor([
+            0.25 * (1 - xi) * (1 - eta),
+            0.25 * (1 + xi) * (1 - eta),
+            0.25 * (1 + xi) * (1 + eta),
+            0.25 * (1 - xi) * (1 + eta)
+        ], dtype=torch.float).to(device)
+        
+        return N
+    
+    @staticmethod
+    def shape_function_derivatives(device='cuda') -> torch.Tensor:
+        dN_dxi = torch.tensor([
+            [-0.25, 0.25, 0.25, -0.25],
+            [-0.25, -0.25, 0.25, 0.25]
+        ], dtype=torch.float).to(device)
+        
+        return dN_dxi
+    
+    @staticmethod
+    def jacobian(node_coords: torch.Tensor, dN_dxi: torch.Tensor, device='cuda') -> torch.Tensor:
+        J = torch.mm(dN_dxi, node_coords)
+        detJ = torch.det(J)
+        if detJ == 0:
+            raise ValueError("The Jacobian is singular")
+        return J
+    
+    @staticmethod
+    def compute_B_matrix(dN_dxi: torch.Tensor, J: torch.Tensor, device='cuda') -> torch.Tensor:
+        inv_J = torch.inverse(J)
+        dN_dxy = torch.mm(inv_J, dN_dxi)
+        
+        B = torch.zeros(3, 8, device=device)  # 3x8 for plane stress or plane strain
+        B[0, 0::2] = dN_dxy[0, :]
+        B[1, 1::2] = dN_dxy[1, :]
+        B[2, 0::2] = dN_dxy[1, :]
+        B[2, 1::2] = dN_dxy[0, :]
+        
+        return B
+
+
+class Quad8Element(BaseElement):
+    element_dof = 16  # 2 DOFs (u, v) for each of the 8 nodes
+    node_per_element = 8  # Number of nodes for Q8 element
+    dimension = 2  # 2D element
+
+    @staticmethod
+    def shape_functions(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coords
+        N = torch.tensor([
+            0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1),
+            0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1),
+            0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1),
+            0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1),
+            0.5 * (1 - xi ** 2) * (1 - eta),
+            0.5 * (1 + xi) * (1 - eta ** 2),
+            0.5 * (1 - xi ** 2) * (1 + eta),
+            0.5 * (1 - xi) * (1 - eta ** 2)
+        ], dtype=torch.float).to(device)
+        
+        return N
+    
+    @staticmethod
+    def shape_function_derivatives(natural_coor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coor
+        dN_dxi = torch.tensor([
+            [0.25*(eta - 1)*(eta + 2*xi), 0.25*(eta - 1)*(eta - 2*xi), 0.25*(eta + 1)*(eta + 2*xi),0.25*(-eta + 2*xi)*(eta + 1),1.0*xi*(eta - 1),0.5 - 0.5*eta**2,-1.0*xi*(eta + 1),0.5*eta**2 - 0.5,],
+            [0.25*(2*eta + xi)*(xi - 1), 0.25*(2*eta - xi)*(xi + 1),0.25*(2*eta + xi)*(xi + 1),0.25*(-2*eta + xi)*(xi - 1),0.5*xi**2 - 0.5,-1.0*eta*(xi + 1),0.5 - 0.5*xi**2,eta*(xi - 1)]
+        ], dtype=torch.float).to(device)
+        
+        return dN_dxi
+
+    @staticmethod
+    def jacobian(node_coords: torch.Tensor, dN_dxi: torch.Tensor, device='cuda') -> torch.Tensor:
+        J = torch.mm(dN_dxi, node_coords)
+        detJ = torch.det(J)
+        if detJ == 0:
+            raise ValueError("The Jacobian is singular")
+        return J
+
+    @staticmethod
+    def compute_B_matrix(dN_dxi: torch.Tensor, J: torch.Tensor, device='cuda') -> torch.Tensor:
+        inv_J = torch.inverse(J)
+        dN_dxy = torch.mm(inv_J, dN_dxi)
+        
+        B = torch.zeros(3, 16, device=device)  # 3x16 for plane stress or plane strain
+        B[0, 0::2] = dN_dxy[0, :]
+        B[1, 1::2] = dN_dxy[1, :]
+        B[2, 0::2] = dN_dxy[1, :]
+        B[2, 1::2] = dN_dxy[0, :]
+        
+        return B
