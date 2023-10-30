@@ -224,20 +224,25 @@ class T3Element(TriangularElement):
     dimension = 2  # 2D element
 
     @staticmethod
-    def shape_functions(gauss_point, device):
-        xi, eta = gauss_point
-        N = torch.tensor([
-            1 - xi - eta,
-            xi,
-            eta
-        ], dtype=torch.float, device=device)
-        
+    def shape_function_derivatives(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coords
         dN_dxi = torch.tensor([
             [-1, 1, 0],
             [-1, 0, 1]
         ], dtype=torch.float, device=device)
         
-        return N, dN_dxi
+        return dN_dxi
+    
+    @staticmethod
+    def shape_functions(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coords
+        N = torch.tensor([
+            1 - xi - eta,
+            xi,
+            eta
+        ], dtype=torch.float, device=device)
+        return N
+
 
     @staticmethod
     def jacobian(node_coords, dN_dxi, device):
@@ -278,10 +283,11 @@ class QuadElement(BaseElement):
         return N
     
     @staticmethod
-    def shape_function_derivatives(device='cuda') -> torch.Tensor:
+    def shape_function_derivatives(natural_coords: torch.Tensor, device='cuda') -> torch.Tensor:
+        xi, eta = natural_coords
         dN_dxi = torch.tensor([
-            [-0.25, 0.25, 0.25, -0.25],
-            [-0.25, -0.25, 0.25, 0.25]
+            [-0.25*(1-eta), 0.25*(1-eta), 0.25*(1+eta), -0.25*(1+eta)],
+            [-0.25*(1-xi), -0.25*(1+xi), 0.25*(1+xi), 0.25*(1-xi)]
         ], dtype=torch.float).to(device)
         
         return dN_dxi
@@ -320,7 +326,7 @@ class Quad8Element(BaseElement):
             0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1),
             0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1),
             0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1),
-            0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1),
+            0.25 * (1 - xi) * (1 + eta) * (eta - xi - 1),
             0.5 * (1 - xi ** 2) * (1 - eta),
             0.5 * (1 + xi) * (1 - eta ** 2),
             0.5 * (1 - xi ** 2) * (1 + eta),
@@ -333,8 +339,8 @@ class Quad8Element(BaseElement):
     def shape_function_derivatives(natural_coor, device='cuda') -> torch.Tensor:
         xi, eta = natural_coor
         dN_dxi = torch.tensor([
-            [0.25*(eta - 1)*(eta + 2*xi), 0.25*(eta - 1)*(eta - 2*xi), 0.25*(eta + 1)*(eta + 2*xi),0.25*(-eta + 2*xi)*(eta + 1),1.0*xi*(eta - 1),0.5 - 0.5*eta**2,-1.0*xi*(eta + 1),0.5*eta**2 - 0.5,],
-            [0.25*(2*eta + xi)*(xi - 1), 0.25*(2*eta - xi)*(xi + 1),0.25*(2*eta + xi)*(xi + 1),0.25*(-2*eta + xi)*(xi - 1),0.5*xi**2 - 0.5,-1.0*eta*(xi + 1),0.5 - 0.5*xi**2,eta*(xi - 1)]
+            [-0.25*(eta - 1)*(eta + 2*xi), 0.25*(eta - 1)*(eta - 2*xi), 0.25*(eta + 1)*(eta + 2*xi),0.25*(-eta + 2*xi)*(eta + 1),1.0*xi*(eta - 1),0.5 - 0.5*eta**2,-1.0*xi*(eta + 1),0.5*eta**2 - 0.5],
+            [-0.25*(2*eta + xi)*(xi - 1), 0.25*(2*eta - xi)*(xi + 1),0.25*(2*eta + xi)*(xi + 1),0.25*(-2*eta + xi)*(xi - 1),0.5*xi**2 - 0.5,-1.0*eta*(xi + 1),0.5 - 0.5*xi**2,eta*(xi - 1)]
         ], dtype=torch.float).to(device)
         
         return dN_dxi

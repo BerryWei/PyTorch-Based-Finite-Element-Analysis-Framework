@@ -60,7 +60,8 @@ class FiniteElementModel:
 
             K_elem = torch.zeros(dof_per_element, dof_per_element, device=self.device)
             for gauss_point, weight in zip(gauss_points, weights):
-                N, dN_dxi = ElementClass.shape_functions(gauss_point, device=self.device)
+                N = ElementClass.shape_functions(gauss_point, device=self.device)
+                dN_dxi = ElementClass.shape_function_derivatives(gauss_point, device=self.device)
                 J = ElementClass.jacobian(node_coords, dN_dxi, device=self.device)
                 detJ = torch.det(J)
                 
@@ -341,7 +342,7 @@ class FiniteElementModel:
                 gauss_point = torch.tensor([1/3, 1/3], device=self.device)
 
                 # Compute shape function derivatives and Jacobian
-                _, dN_dxi = ElementClass.shape_functions(gauss_point, device=self.device)
+                dN_dxi = ElementClass.shape_function_derivatives(gauss_point, device=self.device)
                 J = ElementClass.jacobian(node_coords, dN_dxi, device=self.device)
                 
                 # Compute B_matrix

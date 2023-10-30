@@ -1,13 +1,13 @@
 import yaml
 
-with open(r"D:\finite_element_method/hw1-2", "r") as file:
+with open(r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem3_b\hw3-3-b", "r") as file:
     hw1_1_content = file.read()
 # Splitting the content into sections
 sections = [section.strip() for section in hw1_1_content.split('*') if section.strip()]
 
 # Initializing the dictionary to store the parsed data
 data = {}
-
+boundary = {}
 # Parsing each section
 for section in sections:
     lines = section.split('\n')
@@ -59,7 +59,7 @@ for section in sections:
         prescribed_load_lines = content[4+num_prescribed_disp:]
         prescribed_loads = [list(map(float, line.split())) if line else [] for line in prescribed_load_lines]
 
-        data["BOUNDARY"] = {
+        boundary["BOUNDARY"] = {
                 "num-prescribed-disp": num_prescribed_disp,
                 "prescribed-disps": prescribed_disps,
                 "num-prescribed-load": num_prescribed_load,
@@ -69,11 +69,14 @@ for section in sections:
 
 
 # Saving the converted data to input.yaml
-output_path = r"D:\finite_element_method/geometry.yaml"
+output_path = r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem3_b/geometry.yaml"
 with open(output_path, "w") as f:
     yaml.dump(data, f, default_flow_style=None)
 
-print("num-prescribed-disp:", data["BOUNDARY"]["num-prescribed-disp"])
+print("num-prescribed-disp:", boundary["BOUNDARY"]["num-prescribed-disp"])
 print("node#-dof#-disp:")
-for disp in data["BOUNDARY"]["prescribed-disps"]:
+for disp in boundary["BOUNDARY"]["prescribed-disps"]:
+    print(disp[0], disp[1], disp[2])
+
+for disp in boundary["BOUNDARY"]["prescribed-disps"]:
     print(disp[0], disp[1], disp[2])

@@ -30,12 +30,12 @@ class GaussQuadrature:
             
             elif self.nelnd == 4: # M=4
                 gauss_points = torch.tensor([
-                    [1/3, 1/3],
-                    [0.6, 0.2],
-                    [0.2, 0.6],
-                    [0.2, 0.2]
+                    [-0.577350269, -0.577350269],
+                    [+0.577350269, -0.577350269],
+                    [-0.577350269, +0.577350269],
+                    [+0.577350269, +0.577350269],
                 ])
-                weights = torch.tensor([-27/96, 25/96, 25/96, 25/96])  # Assuming equal weights
+                weights = torch.tensor([1, 1, 1, 1])  # Assuming equal weights
                 return gauss_points, weights
             
             elif self.nelnd == 8: # M=9

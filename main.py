@@ -74,7 +74,9 @@ def post_processing(model, ElementClass):
     """
     logger.info("Post-processing...")
     model.compute_elemental_strains_stresses(ElementClass=ElementClass)
-    model.save_results_to_file(file_path=Path('output.opt'))
+    
+    parent_folder = args.geometry_path.parent
+    model.save_results_to_file(file_path= parent_folder / 'output.opt' )
 
     def elemental_strain_x():
         return model.elemental_strains[:, 0]
@@ -85,7 +87,6 @@ def post_processing(model, ElementClass):
     model.plot([elemental_strain_x])
     model.plot([elemental_stress_x])
 
-
 def main(args):
     model = initialize_model(args)
     ElementClass = eval(model.element_type)
@@ -95,9 +96,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\hw3_Problem1\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\hw3_Problem1\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\hw3_Problem1\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\hw3_Problem2_q8\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\hw3_Problem2_q8\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\hw3_Problem2_q8\loading.yaml', help='Path to the loading.yaml file.')
 
     args = parser.parse_args()
     main(args)
