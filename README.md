@@ -5,8 +5,9 @@ Introducing a framework designed for Finite Element Analysis (FEA) with PyTorch 
 ## Key Features
 
 - Element types supported:
-    - T3 (triangular element with 3 nodes)
-    - ... 
+    - T3Element
+    - QuadElement
+    - Quad8Element
 
 - Material models supported:
     - Linear Elasticity
