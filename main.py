@@ -50,22 +50,23 @@ def initialize_model(args):
     
     return model
 
-def run_analysis(model, ElementClass):
+def run_analysis(model):
     """
     Run the FEM analysis.
     """
     start_time = time.time()
     logger.info("Computing the element stiffness...")
 
-    model.generate_material_dict(ElementClass=ElementClass)
+    model.init_element_class()
+    model.generate_material_dict()
 
     if args.incompatible_mode_element == True:
-        model.compute_element_stiffness_with_shear_locking(ElementClass=ElementClass)
+        model.compute_element_stiffness_with_shear_locking()
     else:
-        model.compute_element_stiffness(ElementClass=ElementClass)
+        model.compute_element_stiffness()
     logger.info("Assembling the element stiffness...")
     model.assemble_global_stiffness()
-    model.assemble_global_load_vector(ElementClass=ElementClass)
+    model.assemble_global_load_vector()
     model.solve_system()
 
     end_time = time.time()
@@ -73,12 +74,12 @@ def run_analysis(model, ElementClass):
     logger.info(f"Finite Element Model execution completed in {total_time:.2f} seconds.")
 
 
-def post_processing(model, ElementClass):
+def post_processing(model):
     """
     Perform post-processing steps.
     """
     logger.info("Post-processing...")
-    model.compute_GP_strains_stresses(ElementClass=ElementClass)
+    model.compute_GP_strains_stresses()
 
 
 
@@ -95,7 +96,7 @@ def post_processing(model, ElementClass):
     )
 
     model_cell_types = get_vtk_cell_type(
-        ElementClass.node_per_element,
+        model.elementClass.node_per_element,
         model.parameters['num_dimensions']
     )
 
@@ -149,9 +150,9 @@ def post_processing(model, ElementClass):
 
 def main(args):
     model = initialize_model(args)
-    ElementClass = eval(model.element_type)
-    run_analysis(model, ElementClass)
-    post_processing(model, ElementClass)
+    
+    run_analysis(model)
+    post_processing(model)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
