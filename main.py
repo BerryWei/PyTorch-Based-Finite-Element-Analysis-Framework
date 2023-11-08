@@ -58,7 +58,7 @@ def run_analysis(model, ElementClass):
     logger.info("Computing the element stiffness...")
 
     model.generate_material_dict(ElementClass=ElementClass)
-    args.incompatible_mode_element = True
+
     if args.incompatible_mode_element == True:
         model.compute_element_stiffness_with_shear_locking(ElementClass=ElementClass)
     else:
