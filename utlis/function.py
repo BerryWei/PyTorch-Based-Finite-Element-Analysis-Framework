@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import Rbf
-import pyvista as pv
+
 
 def interpolate_to_nodes(input_coor, input_attribute, target_coor):
     """
