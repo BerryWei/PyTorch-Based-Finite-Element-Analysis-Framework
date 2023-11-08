@@ -55,10 +55,14 @@ def run_analysis(model, ElementClass):
     Run the FEM analysis.
     """
     start_time = time.time()
-    
     logger.info("Computing the element stiffness...")
-    model.compute_element_stiffness(material=model.material, ElementClass=ElementClass)
-    #model.compute_element_stiffness_vectorize(material=model.material, ElementClass=ElementClass)
+
+    model.generate_material_dict(ElementClass=ElementClass)
+    args.incompatible_mode_element = True
+    if args.incompatible_mode_element == True:
+        model.compute_element_stiffness_with_shear_locking(ElementClass=ElementClass)
+    else:
+        model.compute_element_stiffness(ElementClass=ElementClass)
     logger.info("Assembling the element stiffness...")
     model.assemble_global_stiffness()
     model.assemble_global_load_vector(ElementClass=ElementClass)
@@ -115,34 +119,33 @@ def post_processing(model, ElementClass):
     strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
     stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
     
+    # compute von Mises stress in 2D
+    stress11 = stress_components['stress11']
+    stress22 = stress_components['stress22']
+    stress12 = stress_components['stress12']
+    von_mises_stress = np.sqrt(stress11**2 - stress11*stress22 + stress22**2 + 3*stress12**2)
+    
+
+
+
     point_data = {
         **stress_components,
         **strain_components,
-        **disp_dict
+        **disp_dict,
+        'von_mises_stress': von_mises_stress
     }
 
+    parent_folder = args.geometry_path.parent
     write_to_vtk_manual(
         node_coords=node_coords_3d,
         cell_array=model.element_node_indices.cpu().numpy(),  # This should be the actual cells data from your model
         cell_types=np.full(model.element_node_indices.shape[0], model_cell_types),  # Create an array filled with the cell type
         point_data=point_data,
-        filename='mesh_data.vtk'
+        filename=parent_folder / 'results.vtk'
     )
 
 
 
-
-    parent_folder = args.geometry_path.parent
-    model.save_results_to_file(file_path= parent_folder / 'output.opt' )
-
-    def elemental_strain_x():
-        return model.elemental_strains[:, 0]
-
-    def elemental_stress_x():
-        return model.elemental_stresses[:, 0]
-
-    model.plot([elemental_strain_x])
-    model.plot([elemental_stress_x])
 
 def main(args):
     model = initialize_model(args)
@@ -153,9 +156,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\example\hw3_Problem2_q8\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\example\hw3_Problem2_q8\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\example\hw3_Problem2_q8\loading.yaml', help='Path to the loading.yaml file.')
-
+    parser.add_argument('--geometry_path', type=Path, default='.\example\hw4_Problem2_q4_c\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\example\hw4_Problem2_q4_c\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\example\hw4_Problem2_q4_c\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--incompatible_mode_element', action='store_true', help='Flag to enable incompatible mode for the element.')
     args = parser.parse_args()
     main(args)

@@ -87,7 +87,7 @@ class Elasticity_2D(ConstitutiveLaw):
     - stiffMat2d (torch.Tensor): Stiffness matrix for the 2D analysis.
     """
 
-    def __init__(self, E, mu, is_plane_strain=True):
+    def __init__(self, E, mu, is_plane_strain=True, device='cuda'):
         self.is_plane_strain = is_plane_strain
         
         # Depending on the condition, adjust the stiffness matrix accordingly
@@ -97,14 +97,14 @@ class Elasticity_2D(ConstitutiveLaw):
                 [1-mu, mu, 0],
                 [mu, 1-mu, 0],
                 [0, 0, (1-2*mu)/2]
-            ])
+            ], dtype=torch.float64, device=device)
         else:
             # Stiffness matrix for plane stress condition
             self.stiffMat2d = E/(1-mu*mu) * torch.tensor([
                 [1, mu, 0],
                 [mu, 1, 0],
                 [0, 0, (1-mu)/2]
-            ])
+            ], dtype=torch.float64, device=device)
 
 
     def update_states(self, deps, stressN, alphaN, epN):

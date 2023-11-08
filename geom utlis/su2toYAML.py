@@ -59,8 +59,8 @@ def convert_to_yaml(node_coords, elem_conn, yaml_filepath):
         yaml.dump(data_dict, f, default_flow_style=None)
 
 # File paths
-su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem2_q8/rectangle_q8.su2'
-yaml_filepath = r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem2_q8/geometry.yaml'
+su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw4_Problem2_q8_d/rectangle_q8.su2'
+yaml_filepath = r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw4_Problem2_q8_d/geometry.yaml'
 
 # Read SU2 file and convert to YAML format
 node_coords, elem_conn = read_su2_file(su2_filepath)
