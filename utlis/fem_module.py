@@ -9,6 +9,7 @@ from .material import *
 from tqdm import tqdm
 from pathlib import Path
 from .gaussQuadrature import GaussQuadrature
+from scipy.interpolate import Rbf
 
 class FiniteElementModel:
     def __init__(self, device: str='cuda') -> None:
@@ -324,38 +325,48 @@ class FiniteElementModel:
 
 
 
-    def compute_elemental_strains_stresses(self, ElementClass: Type[BaseElement]) -> None:
-            """Compute strains and stresses for each element."""
-            if self.parameters['num_dimensions'] == 2:
-                dim = 3
-            elif self.parameters['num_dimensions'] == 3:
-                dim = 6
-            else:
-                raise ValueError(f"self.parameters['num_dimensions'] = {self.parameters['num_dimensions']} is not correct.")
-            self.elemental_strains = torch.zeros(self.num_element, dim, device=self.device)  # Assuming plane strain condition
-            self.elemental_stresses = torch.zeros(self.num_element, dim, device=self.device)  # Assuming plane strain condition
+    def compute_GP_strains_stresses(self, ElementClass: Type[BaseElement]) -> None:
+        """Compute strains and stresses for each element."""
+        if self.parameters['num_dimensions'] == 2:
+            dim = 3
+        elif self.parameters['num_dimensions'] == 3:
+            dim = 6
+        else:
+            raise ValueError(f"self.parameters['num_dimensions'] = {self.parameters['num_dimensions']} is not correct.")
+        self.elemental_strains = torch.zeros(self.num_element, dim, device=self.device)  
+        self.elemental_stresses = torch.zeros(self.num_element, dim, device=self.device)  
+        num_dof_per_node = self.parameters['num_dimensions']
+        gauss_quadrature = GaussQuadrature(ElementClass.node_per_element, num_dof_per_node)
+        gauss_points, weights = gauss_quadrature.get_points_and_weights()
 
-            for i, elem_nodes in enumerate(self.element_node_indices):
-                node_coords = self.node_coords[elem_nodes]
+        # Additional storage for Gauss point coordinates, strains, and stresses
+        self.gauss_point_coordinates = torch.zeros((self.num_element, len(gauss_points), num_dof_per_node), device=self.device)
+        self.gauss_point_strains = torch.zeros((self.num_element, len(gauss_points), dim), device=self.device)  
+        self.gauss_point_stresses = torch.zeros((self.num_element, len(gauss_points), dim), device=self.device)  
 
-                # Assuming a single Gauss point for simplicity
-                gauss_point = torch.tensor([1/3, 1/3], device=self.device)
+        for i in range(self.num_element):
+            elem_nodes = self.element_node_indices[i]
+            node_coords = self.node_coords[elem_nodes]
+            elem_dof_indices = torch.cat([(elem_nodes*num_dof_per_node + i).unsqueeze(0) for i in range(num_dof_per_node)], dim=0)
+            elem_dof_indices = elem_dof_indices.t().contiguous().view(-1)
 
-                # Compute shape function derivatives and Jacobian
+            elem_displacements = self.global_displacements[elem_dof_indices]
+
+            for j, gauss_point in enumerate(gauss_points):
+                N = ElementClass.shape_functions(gauss_point, device=self.device)
+                physical_coords = torch.mm(N.unsqueeze(0), node_coords).squeeze(0)
+                self.gauss_point_coordinates[i, j] = physical_coords
+
+                # Compute strains and stresses at each Gauss point
                 dN_dxi = ElementClass.shape_function_derivatives(gauss_point, device=self.device)
                 J = ElementClass.jacobian(node_coords, dN_dxi, device=self.device)
-                
-                # Compute B_matrix
                 B_matrix = ElementClass.compute_B_matrix(dN_dxi, J, device=self.device)
-
-                # elem_nodes = [n1, n2, n3]--> elem_dof_indices = [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n3, 2*n3+1]
-                elem_dof_indices = torch.cat([(self.parameters['num_dimensions']*elem_nodes).unsqueeze(-1), (self.parameters['num_dimensions']*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).long()
-                elem_displacements = self.global_displacements[elem_dof_indices]
                 strains = B_matrix @ elem_displacements
-                stresses = self.material.consistent_tangent(element_index = i) @ strains
+                stresses = self.material.consistent_tangent(element_index=i) @ strains
                 
-                self.elemental_strains[i] = strains
-                self.elemental_stresses[i] = stresses
+                self.gauss_point_strains[i, j] = strains  # Store strains at Gauss points
+                self.gauss_point_stresses[i, j] = stresses  # Store stresses at Gauss points
+            
 
     def save_results_to_file(self, file_path: Path) -> None:
         """Save elemental strains and stresses to a file."""
@@ -431,3 +442,5 @@ class FiniteElementModel:
 
         selected_element_indices = [idx for idx, element in enumerate(element_node_indices) if is_element_in_range(element)]
         return selected_element_indices
+
+
