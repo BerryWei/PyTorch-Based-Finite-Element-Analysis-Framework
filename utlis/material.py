@@ -147,32 +147,71 @@ class Elasticity_2D(ConstitutiveLaw):
         """
         self.stiffMat2d = self.stiffMat2d.to(device)
 
-    def consistent_tangent_vectorized(self, num_elements=None, deps=None, stressN=None, alphaN=None, epN=None):
+class Elasticity_3D(ConstitutiveLaw):
+    r"""
+    Elastic Constitutive Model for 2D analysis with an option for plane strain.
+
+    Parameters:
+    - E (float or torch.Tensor): Young's Modulus.
+    - mu (float or torch.Tensor): Poisson's ratio.
+    - is_plane_strain (bool, optional): Flag to determine if the analysis is for plane strain. Defaults to True.
+
+    Attributes:
+    - stiffMat2d (torch.Tensor): Stiffness matrix for the 2D analysis.
+    """
+
+    def __init__(self, E, mu, device='cuda'):
+
+        # Convert E and mu to tensors if they are not already
+        if not isinstance(E, torch.Tensor):
+            E = torch.tensor(E, dtype=torch.float64, device=device)
+        if not isinstance(mu, torch.Tensor):
+            mu = torch.tensor(mu, dtype=torch.float64, device=device)
+
+        # Compute Lame parameters
+        lambda_ = (E * mu) / ((1 + mu) * (1 - 2 * mu))
+        mu = E / (2 * (1 + mu))
+                
+        # Create stiffness matrix for 3D isotropic material
+        self.stiffMat3d = torch.tensor([
+            [lambda_ + 2 * mu, lambda_, lambda_, 0, 0, 0],
+            [lambda_, lambda_ + 2 * mu, lambda_, 0, 0, 0],
+            [lambda_, lambda_, lambda_ + 2 * mu, 0, 0, 0],
+            [0, 0, 0, mu, 0, 0],
+            [0, 0, 0, 0, mu, 0],
+            [0, 0, 0, 0, 0, mu]
+        ], dtype=torch.float64, device=device)
+
+
+
+    def update_states(self, deps, stressN, alphaN, epN):
         r"""
-        Return consistent tangent (stiffness matrix) for the current state in a vectorized manner.
+        Update internal variables based on the provided incremental strain.
 
         Parameters:
-        - num_elements (int, optional): Number of elements for which the tangent is needed. Only required if other parameters are None.
-        - deps (torch.Tensor, optional): Incremental strain for each element. Shape: (num_elements, ...). Defaults to None.
-        - stressN (torch.Tensor, optional): Stress from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
-        - alphaN (torch.Tensor, optional): Back-stress from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
-        - epN (torch.Tensor, optional): Effective plastic strain from the previous load step for each element. Shape: (num_elements, ...). Defaults to None.
+        - deps (torch.Tensor): Incremental strain.
+        - stressN (torch.Tensor): Stress from the previous load step.
+        - alphaN (torch.Tensor): Back-stress from the previous load step.
+        - epN (float or torch.Tensor): Effective plastic strain from the previous load step.
 
         Returns:
-        - torch.Tensor: Consistent tangent (stiffness matrix) for each element. Shape: (num_elements, ...).
+        - tuple: Updated stress, back-stress, and effective plastic strain.
         """
-        
-        if num_elements is None:
-            if deps is not None:
-                num_elements = deps.shape[0]
-            elif stressN is not None:
-                num_elements = stressN.shape[0]
-            elif alphaN is not None:
-                num_elements = alphaN.shape[0]
-            elif epN is not None:
-                num_elements = epN.shape[0]
-            else:
-                raise ValueError("Either provide num_elements or one of the other parameters to infer the batch size.")
-        
-        # Reshape the stiffMat2d to handle batch of elements
-        return self.stiffMat2d.unsqueeze(0).repeat(num_elements, 1, 1)
+        stress = stressN + self.stiffMat3d @ deps
+        return (stress, alphaN, epN)
+
+    def consistent_tangent(self, element_index = None, deps=None, stressN=None, alphaN=None, epN=None):
+        r"""
+        Return consistent tangent (stiffness matrix) for the current state.
+
+        Parameters:
+        - deps (torch.Tensor, optional): Incremental strain. Defaults to None.
+        - stressN (torch.Tensor, optional): Stress from the previous load step. Defaults to None.
+        - alphaN (torch.Tensor, optional): Back-stress from the previous load step. Defaults to None.
+        - epN (float or torch.Tensor, optional): Effective plastic strain from the previous load step. Defaults to None.
+
+        Returns:
+        - torch.Tensor: Consistent tangent (stiffness matrix).
+        """
+        return self.stiffMat3d
+

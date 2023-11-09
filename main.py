@@ -107,6 +107,14 @@ def post_processing(model):
             'disp_x' : model.global_displacements[0::2],
             'disp_y' : model.global_displacements[1::2],
         }
+        strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
+        stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
+        
+        # compute von Mises stress in 2D
+        stress11 = stress_components['stress11']
+        stress22 = stress_components['stress22']
+        stress12 = stress_components['stress12']
+        von_mises_stress = np.sqrt(stress11**2 - stress11*stress22 + stress22**2 + 3*stress12**2)
 
     else:
         node_coords_3d = model.node_coords.cpu().numpy()
@@ -116,15 +124,34 @@ def post_processing(model):
             'disp_z' : model.global_displacements[2::3],
         }
 
+        strain_components = {
+            'strain11': node_strains[:, 0],
+            'strain22': node_strains[:, 1],
+            'strain33': node_strains[:, 2],
+            'strain23': node_strains[:, 3],
+            'strain13': node_strains[:, 4],
+            'strain12': node_strains[:, 5]
+        }
+        stress_components = {
+            'stress11': node_stresses[:, 0],
+            'stress22': node_stresses[:, 1],
+            'stress33': node_stresses[:, 2],
+            'stress23': node_stresses[:, 3],
+            'stress13': node_stresses[:, 4],
+            'stress12': node_stresses[:, 5]
+        }
 
-    strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
-    stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
-    
-    # compute von Mises stress in 2D
-    stress11 = stress_components['stress11']
-    stress22 = stress_components['stress22']
-    stress12 = stress_components['stress12']
-    von_mises_stress = np.sqrt(stress11**2 - stress11*stress22 + stress22**2 + 3*stress12**2)
+        # Compute von Mises stress for 3D
+        stress11 = stress_components['stress11']
+        stress22 = stress_components['stress22']
+        stress33 = stress_components['stress33']
+        stress12 = stress_components['stress12']
+        stress13 = stress_components['stress13']
+        stress23 = stress_components['stress23']
+        von_mises_stress = np.sqrt(
+            0.5 * ((stress11 - stress22)**2 + (stress22 - stress33)**2 + (stress33 - stress11)**2) +
+            3 * (stress12**2 + stress13**2 + stress23**2)
+        )
     
 
 
@@ -156,10 +183,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
-    parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\example\hw4_Problem2_q4_c\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\example\hw4_Problem2_q4_c\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\example\hw4_Problem2_q4_c\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cpu', help='Device to run the FEM.')
+    parser.add_argument('--geometry_path', type=Path, default='.\example\hw4_Problem2_q8_d\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\example\hw4_Problem2_q8_d\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\example\hw4_Problem2_q8_d\loading.yaml', help='Path to the loading.yaml file.')
     parser.add_argument('--incompatible_mode_element', action='store_true', help='Flag to enable incompatible mode for the element.')
     args = parser.parse_args()
     main(args)

@@ -10,6 +10,7 @@ from tqdm import tqdm
 from pathlib import Path
 from .gaussQuadrature import GaussQuadrature
 from scipy.interpolate import Rbf
+from tqdm import tqdm
 
 class FiniteElementModel:
     def __init__(self, device: str='cuda') -> None:
@@ -48,10 +49,16 @@ class FiniteElementModel:
     def generate_material_dict(self) -> None:
 
         n_dim = self.parameters['num_dimensions']
-        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim)
+        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim, device=self.device)
         gauss_points, weights = gauss_quadrature.get_points_and_weights()
         self.MaterialClass_args['device'] = self.device
-        self.material_dict = {(i, j): eval(self.MaterialClass_name)(**self.MaterialClass_args) for i in range(self.num_element) for j in range(len(gauss_points))}
+        self.material_dict = {}
+        total_iterations = self.num_element * len(gauss_points)
+        with tqdm(total=total_iterations, desc='Initializing Materials') as pbar:
+            for i in range(self.num_element):
+                for j in range(len(gauss_points)):
+                    self.material_dict[(i, j)] = eval(self.MaterialClass_name)(**self.MaterialClass_args)
+                    pbar.update(1)  # Update the progress bar by one iteration
         
 
     def init_element_class(self):
@@ -66,22 +73,22 @@ class FiniteElementModel:
         n_dim = self.parameters['num_dimensions']
         self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
 
-        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim)
+        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim, device=self.device)
         gauss_points, weights = gauss_quadrature.get_points_and_weights()
 
 
-        for i in range(self.num_element):
+        for i in tqdm(range(self.num_element), desc='Computing Stiffness Matrix'):
             elem_nodes = self.element_node_indices[i]
             node_coords = self.node_coords[elem_nodes].type(torch.float64)
 
             K_elem = torch.zeros(dof_per_element, dof_per_element, dtype=torch.float64, device=self.device)
             for j, (gauss_point, weight) in enumerate(zip(gauss_points, weights)):
 
-                dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device).type(torch.float64)
+                dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device)
                 J = self.elementClass.jacobian(node_coords, dN_dxi, device=self.device)
                 detJ = torch.det(J)
                 
-                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device).type(torch.float64)
+                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device)
                 D_matrix = self.material_dict[(i, j)].consistent_tangent().type(torch.float64)
 
                 K_elem += weight * detJ * torch.einsum('ji,jk,kl->il', B_matrix, D_matrix, B_matrix)
@@ -134,7 +141,7 @@ class FiniteElementModel:
         n_dim = self.parameters['num_dimensions']
         for i, elem_nodes in enumerate(self.element_node_indices):
             # Determine the global degree of freedom indices for this element
-            elem_dof_indices = torch.cat([(n_dim*elem_nodes).unsqueeze(-1), (n_dim*elem_nodes+1).unsqueeze(-1)], dim=-1).view(-1).long()
+            elem_dof_indices = (elem_nodes.unsqueeze(-1) * n_dim + dof_per_dimension).view(-1).long()
             
             # Assemble the element stiffness matrix into the global stiffness matrix
             self.global_stiffness[elem_dof_indices[:, None], elem_dof_indices[None, :]] += self.element_stiffnesses[i]
@@ -159,7 +166,7 @@ class FiniteElementModel:
         # Update the mesh attributes
         self.num_element = data['Element']['num-elem']
         self.num_node = data['NODE']['num-node']
-        self.node_coords = torch.tensor(data["NODE"]['nodal-coord'])
+        self.node_coords = torch.tensor(data["NODE"]['nodal-coord'], dtype=torch.float64)
         self.element_node_indices = torch.tensor(data["Element"]['elem-conn'], dtype=torch.long)
         
         # Update the derived attributes
@@ -227,7 +234,7 @@ class FiniteElementModel:
             data = yaml.safe_load(file)
 
         # Whitelist of allowed material models
-        allowed_models = ["Elasticity_2D", "Elasticity"]
+        allowed_models = ["Elasticity_2D", "Elasticity", "Elasticity_3D"]
 
         model_name = data['MODEL']
         if model_name not in allowed_models:
@@ -354,19 +361,19 @@ class FiniteElementModel:
             raise ValueError(f"self.parameters['num_dimensions'] = {self.parameters['num_dimensions']} is not correct.")
         self.elemental_strains = torch.zeros(self.num_element, dim, device=self.device)  
         self.elemental_stresses = torch.zeros(self.num_element, dim, device=self.device)  
-        num_dof_per_node = self.parameters['num_dimensions']
-        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, num_dof_per_node)
+        ndim = self.parameters['num_dimensions']
+        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, ndim, device=self.device)
         gauss_points, weights = gauss_quadrature.get_points_and_weights()
 
         # Additional storage for Gauss point coordinates, strains, and stresses
-        self.gauss_point_coordinates = torch.zeros((self.num_element, len(gauss_points), num_dof_per_node), device=self.device)
+        self.gauss_point_coordinates = torch.zeros((self.num_element, len(gauss_points), ndim), device=self.device)
         self.gauss_point_strains = torch.zeros((self.num_element, len(gauss_points), dim), device=self.device)  
         self.gauss_point_stresses = torch.zeros((self.num_element, len(gauss_points), dim), device=self.device)  
 
-        for i in range(self.num_element):
+        for i in tqdm(range(self.num_element), desc='Computing stress/strain'):
             elem_nodes = self.element_node_indices[i]
             node_coords = self.node_coords[elem_nodes]
-            elem_dof_indices = torch.cat([(elem_nodes*num_dof_per_node + i).unsqueeze(0) for i in range(num_dof_per_node)], dim=0)
+            elem_dof_indices = torch.cat([(elem_nodes*ndim + i).unsqueeze(0) for i in range(ndim)], dim=0)
             elem_dof_indices = elem_dof_indices.t().contiguous().view(-1)
 
             elem_displacements = self.global_displacements[elem_dof_indices]
@@ -379,7 +386,7 @@ class FiniteElementModel:
                 # Compute strains and stresses at each Gauss point
                 dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device)
                 J = self.elementClass.jacobian(node_coords, dN_dxi, device=self.device)
-                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device).type(torch.float64)
+                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device)
                 strains = B_matrix @ elem_displacements
                 D_matrix = self.material_dict[(i, j)].consistent_tangent().type(torch.float64)
                 stresses = D_matrix @ strains
@@ -470,7 +477,7 @@ class FiniteElementModel:
         n_dim = self.parameters['num_dimensions']
         self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, dtype=torch.float64, device=self.device)
 
-        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim)
+        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim, device=self.device)
         gauss_points, weights = gauss_quadrature.get_points_and_weights()
 
         
@@ -501,22 +508,22 @@ class FiniteElementModel:
             else:
                 raise ValueError(f"{n_dim} is not an allowed value.")
             
-            dN_dxi0 = self.elementClass.shape_function_derivatives(gauss_point0, device=self.device).to(dtype=torch.float64)
-            J0 = self.elementClass.jacobian(node_coords, dN_dxi0, device=self.device).to(dtype=torch.float64)
+            dN_dxi0 = self.elementClass.shape_function_derivatives(gauss_point0, device=self.device)
+            J0 = self.elementClass.jacobian(node_coords, dN_dxi0, device=self.device)
             detJ0 = torch.linalg.det(J0).to(dtype=torch.float64)
 
             
             
             for j, (gauss_point, weight) in enumerate(zip(gauss_points, weights)):
 
-                dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device).to(dtype=torch.float64)
-                J = self.elementClass.jacobian(node_coords, dN_dxi, device=self.device).to(dtype=torch.float64)
+                dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device)
+                J = self.elementClass.jacobian(node_coords, dN_dxi, device=self.device)
                 detJ = torch.linalg.det(J)
                 invJ = torch.linalg.inv(J)
              
                 
 
-                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device).type(torch.float64)
+                B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device)
                 append_matrix = torch.tensor([
                     [detJ0/detJ*gauss_point[0]*invJ[0,0], 0, detJ0/detJ*gauss_point[1]*invJ[1,0], 0],
                     [0, detJ0/detJ*gauss_point[0]*invJ[0,1], 0, detJ0/detJ*gauss_point[1]*invJ[1,1]], 
