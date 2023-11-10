@@ -1,10 +1,10 @@
 // Set the sizes
 sizeX = 20;
 sizeY = 20;
-sizeZ = 0.1;
-numDivisions_X = 20;
-numDivisions_Y = 20;
-numDivisions_Z = 5; // Since sizeZ is much smaller, you might want only one layer in the Z direction.
+sizeZ = 20;
+numDivisions_X = 10;
+numDivisions_Y = 10;
+numDivisions_Z = 10; // Since sizeZ is much smaller, you might want only one layer in the Z direction.
 
 // Calculate mesh size based on the number of divisions
 meshSizeX = sizeX / numDivisions_X;

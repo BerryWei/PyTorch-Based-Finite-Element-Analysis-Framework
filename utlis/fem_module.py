@@ -9,8 +9,8 @@ from .material import *
 from tqdm import tqdm
 from pathlib import Path
 from .gaussQuadrature import GaussQuadrature
-from scipy.interpolate import Rbf
-from tqdm import tqdm
+
+
 
 class FiniteElementModel:
     def __init__(self, device: str='cuda') -> None:
@@ -95,33 +95,6 @@ class FiniteElementModel:
             self.element_stiffnesses[i] = K_elem
 
 
-    def compute_element_stiffness_vectorize(self, material: Material, ElementClass: Type[BaseElement]) -> None:
-            
-        dof_per_element = ElementClass.element_dof
-        self.element_stiffnesses = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
-
-        # Get all node coordinates for all elements at once
-        all_node_coords = self.node_coords[self.element_node_indices]
-
-        # Compute areas for all elements
-        areas = 0.5 * torch.abs(
-            all_node_coords[:, 0, 0] * (all_node_coords[:, 1, 1] - all_node_coords[:, 2, 1]) +
-            all_node_coords[:, 1, 0] * (all_node_coords[:, 2, 1] - all_node_coords[:, 0, 1]) +
-            all_node_coords[:, 2, 0] * (all_node_coords[:, 0, 1] - all_node_coords[:, 1, 1])
-        )
-
-        # Compute B_matrix for all elements
-        B_matrices = ElementClass.compute_B_matrix_vectorized(all_node_coords, device=self.device) # (num_element, 3, dof_per_element)
-
-        # Compute D_matrix for all elements
-        D_matrices = material.consistent_tangent_vectorized(num_elements=self.num_element) # (num_element, 3, 3)
-
-        # Compute K for all elements
-        K_matrices = areas[:, None, None] * torch.einsum('bji,bjk,bkl->bil', B_matrices, D_matrices, B_matrices)
-
-        self.element_stiffnesses = K_matrices
-
-
 
 
     def assemble_global_stiffness(self):
@@ -134,13 +107,12 @@ class FiniteElementModel:
         # Determine the global degree of freedom indices for all elements
         # Calculate the DOF indices for each dimension of each node in the elements
         dof_per_dimension = torch.arange(self.parameters['num_dimensions']).to(self.device).unsqueeze(0)  # [0,1], or[0,1,2]
-        elemental_dof_indices = self.element_node_indices.unsqueeze(-1) * self.parameters['num_dimensions'] + dof_per_dimension  # Broadcasting
-
 
         # Use advanced indexing to assemble all element stiffness matrices into the global stiffness matrix simultaneously
         n_dim = self.parameters['num_dimensions']
-        for i, elem_nodes in enumerate(self.element_node_indices):
-            # Determine the global degree of freedom indices for this element
+
+        for i in tqdm(range(self.num_element), desc="Assembling Stiffness Matrix"):
+            elem_nodes = self.element_node_indices[i]
             elem_dof_indices = (elem_nodes.unsqueeze(-1) * n_dim + dof_per_dimension).view(-1).long()
             
             # Assemble the element stiffness matrix into the global stiffness matrix
@@ -394,81 +366,6 @@ class FiniteElementModel:
                 self.gauss_point_strains[i, j] = strains  # Store strains at Gauss points
                 self.gauss_point_stresses[i, j] = stresses  # Store stresses at Gauss points
             
-
-    def save_results_to_file(self, file_path: Path) -> None:
-        """Save elemental strains and stresses to a file."""
-        with open(file_path, 'w') as file:
-            file.write("*NODE\n")
-            if self.parameters['num_dimensions'] == 2:
-                file.write("node#-u1-u2:\n")
-                for i, node_coord in enumerate(self.node_coords):
-                    disp = self.global_displacements[i*2:i*2+2]
-                    file.write(f"{i} {disp[0]:.12f} {disp[1]:.12f}\n")
-                
-                file.write("*ELEMENT\n")
-                file.write("elem#-e11-e22-e12-s11-s22-s12\n")
-                for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {strain[0]:.12f} {strain[1]:.12f} {strain[2]:.12f} {stress[0]:.12f} {stress[1]:.12f} {stress[2]:.12f}\n")
-            
-            elif self.parameters['num_dimensions'] == 3:
-                file.write("node#-u1-u2-u3:\n")
-                for i, node_coord in enumerate(self.node_coords):
-                    disp = self.global_displacements[i*3:i*3+3]
-                    file.write(f"{i} {disp[0]:.12f} {disp[1]:.12f} {disp[2]:.12f}\n")
-                
-                file.write("*ELEMENT\n")
-                file.write("elem#-e11-e22-e33-e23-e13-e12-s11-s22-s33-s23-s13-s12\n")
-                for i, (strain, stress) in enumerate(zip(self.elemental_strains, self.elemental_stresses)):
-                    file.write(f"{i} {' '.join([f'{val:.12f}' for val in strain])} {' '.join([f'{val:.12f}' for val in stress])}\n")
-            
-            else:
-                raise ValueError(f"Unsupported number of dimensions: {self.parameters['num_dimensions']}")
-
-    def plot(self, funcs: List[Callable[[], torch.Tensor]]) -> None:
-        """
-        Plot the distribution of specified attributes in the domain.
-
-        Parameters:
-        - funcs (List[Callable[[], torch.Tensor]]): A list of functions that return attributes for plotting.
-        """
-        import matplotlib.pyplot as plt
-        import matplotlib.tri as mtri
-
-        x = self.node_coords[:, 0].cpu().numpy()
-        y = self.node_coords[:, 1].cpu().numpy()
-        triangles = self.element_node_indices.cpu().numpy()
-
-        for func in funcs:
-            values = func().cpu().numpy()
-
-            fig, ax = plt.subplots()
-            tripcolor_plot = ax.tripcolor(x, y, triangles, facecolors=values, shading='flat', edgecolors='k')
-            plt.colorbar(tripcolor_plot)
-            ax.set_aspect('equal', 'box')
-            ax.set_title(func.__name__)
-            plt.show()
-    @staticmethod
-    def node_indices_in_x_range(node_coords, x_range):
-        lower_bound, upper_bound = x_range
-        selected_indices = [idx for idx, coord in enumerate(node_coords) if lower_bound <= coord[0] <= upper_bound]
-        return selected_indices
-    
-    @staticmethod
-    def element_indices_in_x_range(element_node_indices, node_coords, x_range):
-        lower_bound, upper_bound = x_range
-
-        # Check if any node of an element is in the given x_range
-        def is_element_in_range(element):
-            for node_index in element:
-                # Ensure that node_index is valid before using it
-                if node_index is not None:
-                    
-                    if lower_bound <= node_coords[node_index][0] <= upper_bound:
-                        return True
-            return False
-
-        selected_element_indices = [idx for idx, element in enumerate(element_node_indices) if is_element_in_range(element)]
-        return selected_element_indices
 
 
     def compute_element_stiffness_with_shear_locking(self) -> None:

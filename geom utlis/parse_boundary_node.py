@@ -61,4 +61,5 @@ print('COPY TO PASTE'+'*'*20)
 for idx, node_id in enumerate(nodes_union):
     print(f'  - [{node_id}, 0, 0.0]')
     print(f'  - [{node_id}, 1, 0.0]')
+    print(f'  - [{node_id}, 2, 0.0]')
 print('END'+'*'*20)

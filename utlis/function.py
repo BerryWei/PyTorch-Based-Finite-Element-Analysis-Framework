@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.interpolate import Rbf
+from tqdm import tqdm
+from multiprocessing import Pool
 
 
 def interpolate_to_nodes(input_coor, input_attribute, target_coor):
@@ -24,14 +26,14 @@ def interpolate_to_nodes(input_coor, input_attribute, target_coor):
     node_attributes = np.zeros((num_nodes, num_attr_components))
     
     if dimensionality == 2:
-        for d in range(num_attr_components):
+        for d in tqdm(range(num_attr_components), desc="Interpolating"):
             rbf = Rbf(flattened_input_coor[:, 0], flattened_input_coor[:, 1],
-                    flattened_input_attribute[:, d], function='multiquadric')
+                    flattened_input_attribute[:, d], function='multiquadric', smooth=1e-9)
             node_attributes[:, d] = rbf(target_coor[:, 0], target_coor[:, 1])
     elif dimensionality == 3:
-        for d in range(num_attr_components):
+        for d in tqdm(range(num_attr_components), desc="Interpolating"):
             rbf = Rbf(flattened_input_coor[:, 0], flattened_input_coor[:, 1], flattened_input_coor[:, 2],
-                    flattened_input_attribute[:, d], function='multiquadric')
+                    flattened_input_attribute[:, d], function='multiquadric', smooth=1e-9)
             node_attributes[:, d] = rbf(target_coor[:, 0], target_coor[:, 1], target_coor[:, 2])
     else:
         raise ValueError("The input coordinate dimension is neither 2D nor 3D.")
@@ -40,6 +42,7 @@ def interpolate_to_nodes(input_coor, input_attribute, target_coor):
 
 
 def write_to_vtk_manual(node_coords, cell_array, cell_types, point_data, filename):
+    
     with open(filename, 'w') as file:
         # 寫入標頭
         file.write("# vtk DataFile Version 2.0\n")
@@ -127,3 +130,5 @@ def add_zero_z_coordinate(node_coords):
     new_node_coords[:, :2] = node_coords
     # The z-coordinate is assumed to be zero and hence not modified (it remains zero from the initialization)
     return new_node_coords
+
+

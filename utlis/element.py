@@ -383,6 +383,4 @@ class BrickElement(BaseElement):
         B[5, 0::3] = dN_dxy[1, :]
         B[5, 1::3] = dN_dxy[0, :]
         B[5, 2::3] = 0
-
-        
         return B
