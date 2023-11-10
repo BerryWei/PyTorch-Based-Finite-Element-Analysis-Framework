@@ -10,7 +10,7 @@ from utlis.function import *
 def get_loggings(ckpt_dir: Path):
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     
-    logger = logging.getLogger(name='FEM-Analysis')
+    logger = logging.getLogger(name='FEM-Analysis: static')
     logger.setLevel(level=logging.INFO)
     # set formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -67,6 +67,8 @@ def run_analysis(model):
     logger.info("Assembling the element stiffness...")
     model.assemble_global_stiffness()
     model.assemble_global_load_vector()
+
+
     logger.info("Solving...")
     model.solve_system()
 

@@ -9,7 +9,7 @@ from .material import *
 from tqdm import tqdm
 from pathlib import Path
 from .gaussQuadrature import GaussQuadrature
-
+from scipy.linalg import sqrtm
 
 
 class FiniteElementModel:
@@ -117,8 +117,6 @@ class FiniteElementModel:
             
             # Assemble the element stiffness matrix into the global stiffness matrix
             self.global_stiffness[elem_dof_indices[:, None], elem_dof_indices[None, :]] += self.element_stiffnesses[i]
-
-        #self.global_stiffness[global_dof_indices[:, :, None], global_dof_indices[:, None, :]] += self.element_stiffnesses
 
 
     def read_geom_from_yaml(self, file_path: Path) -> None:
@@ -445,3 +443,130 @@ class FiniteElementModel:
 
 
 
+    #################
+    ##    modal
+    #################
+
+    def compute_mass_matrix(self) -> None:
+            
+        dof_per_element = self.elementClass.element_dof
+        n_node_per_element  = self.elementClass.node_per_element
+        n_dim = self.parameters['num_dimensions']
+        self.element_massMatrix = torch.zeros(self.num_element, dof_per_element, dof_per_element, device=self.device)
+
+        gauss_quadrature = GaussQuadrature(self.elementClass.node_per_element, n_dim, device=self.device)
+        gauss_points, weights = gauss_quadrature.get_points_and_weights()
+
+
+        for idx in tqdm(range(self.num_element), desc='Computing Mass Matrix'):
+            elem_nodes = self.element_node_indices[idx]
+            node_coords = self.node_coords[elem_nodes].type(torch.float64)
+
+
+            M_elem = torch.zeros(n_node_per_element, n_node_per_element, dtype=torch.float64, device=self.device)
+            
+            for j, (gauss_point, weight) in enumerate(zip(gauss_points, weights)):
+                N = self.elementClass.shape_functions(gauss_point, device=self.device)
+                dN_dxi = self.elementClass.shape_function_derivatives(gauss_point, device=self.device)
+                J = self.elementClass.jacobian(node_coords, dN_dxi, device=self.device)
+                detJ = torch.det(J)
+                
+                rho = self.material_dict[(idx, j)].rho
+
+                M_elem += weight * detJ * rho * torch.einsum('i,j -> ij', N, N)
+
+
+            expanded_mat = torch.zeros(dof_per_element, dof_per_element, dtype=torch.float64, device=self.device)
+            if n_dim == 2:
+                for i in range(M_elem.shape[0]):
+                    for j in range(M_elem.shape[1]):
+                        expanded_mat[i*2, j*2] = M_elem[i, j]      
+                        expanded_mat[i*2+1, j*2+1] = M_elem[i, j] 
+            elif n_dim ==3:
+                for i in range(M_elem.shape[0]):
+                    for j in range(M_elem.shape[1]):
+                        expanded_mat[i*3, j*3] = M_elem[i, j]      
+                        expanded_mat[i*3+1, j*3+1] = M_elem[i, j]
+                        expanded_mat[i*3+2, j*3+2] = M_elem[i, j]
+
+
+            self.element_massMatrix[idx] = expanded_mat
+
+    def assemble_global_mass_matrix(self):
+        """
+        Assemble the global stiffness matrix from the element stiffness matrices.
+        """               
+        # Initialize the global stiffness matrix to zero
+        self.global_mass_matrix = torch.zeros(self.num_dofs, self.num_dofs, device=self.device).to(dtype=torch.float64)
+        
+        # Determine the global degree of freedom indices for all elements
+        # Calculate the DOF indices for each dimension of each node in the elements
+        dof_per_dimension = torch.arange(self.parameters['num_dimensions']).to(self.device).unsqueeze(0)  # [0,1], or[0,1,2]
+
+        # Use advanced indexing to assemble all element stiffness matrices into the global stiffness matrix simultaneously
+        n_dim = self.parameters['num_dimensions']
+
+        for i in tqdm(range(self.num_element), desc="Assembling Mass Matrix"):
+            elem_nodes = self.element_node_indices[i]
+            elem_dof_indices = (elem_nodes.unsqueeze(-1) * n_dim + dof_per_dimension).view(-1).long()
+            
+            # Assemble the element stiffness matrix into the global stiffness matrix
+            self.global_mass_matrix[elem_dof_indices[:, None], elem_dof_indices[None, :]] += self.element_massMatrix[i]
+
+    def solve_system_modal(self):
+        """
+        Solve the global system of equations to get the nodal displacements.
+        """
+
+        # Identify known DOFs from self.node_dof_disp
+        if self.node_dof_disp.numel() > 0:
+            known_dof_indices = (self.node_dof_disp[:, 0] * self.parameters['num_dimensions'] + self.node_dof_disp[:, 1]).long()
+        else:
+            known_dof_indices = torch.tensor([], dtype=torch.long, device=self.device)
+        # Identify unknown DOFs
+        all_dofs = torch.arange(self.num_dofs, device=self.device)
+        unknown_dof_indices = torch.tensor([idx for idx in all_dofs if idx not in known_dof_indices], device=self.device)
+
+        # Extract submatrix and subvector
+        K_sub = self.global_stiffness[unknown_dof_indices, :][:, unknown_dof_indices]
+        M_sub = self.global_mass_matrix[unknown_dof_indices, :][:, unknown_dof_indices]
+        R_sub = self.global_load[unknown_dof_indices]
+
+        # q=M**(1/2); H=Q @ A @ Q.T
+        M_sub_np  = M_sub.cpu().numpy()
+        M_sub_sqrt_np = sqrtm(M_sub_np)
+        M_sub_sqrt = torch.from_numpy(M_sub_sqrt_np)
+        M_sub_sqrt = M_sub_sqrt.to(dtype=torch.float64, device=self.device)
+
+        M_sub_sqrt_inv = torch.linalg.pinv(M_sub_sqrt)
+        H_sub = M_sub_sqrt_inv @ K_sub @ M_sub_sqrt_inv
+
+        Q, S, _ = torch.linalg.svd(H_sub, full_matrices=True)
+        
+        S_sorted, sorted_indices = torch.sort(S, descending=False)
+
+        Q_sorted = Q[:, sorted_indices]
+
+        nmodrbm = 3 if self.parameters['num_dimensions'] == 2 else 6
+
+        Nmode=10
+        self.global_displacements_mod = torch.zeros(self.num_dofs, Nmode,  device=self.device).to(dtype=torch.float64)
+
+        M_sub_sqrt_inv
+        
+
+        # Solve the system
+        u_sub = torch.linalg.solve(K_sub, R_sub.unsqueeze(1))
+        residual = R_sub - K_sub @ u_sub.squeeze()
+        relative_residual_error = torch.norm(residual) / torch.norm(R_sub)
+        print(f"Relative Residual Error: {relative_residual_error.item():.8f}")
+
+
+
+        # Create a global displacement vector
+        self.global_displacements = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+        self.global_displacements[unknown_dof_indices] = u_sub.squeeze()
+
+        # Fill known displacements, if any
+        if self.node_dof_disp.numel() > 0:
+            self.global_displacements[known_dof_indices] = self.node_dof_disp[:, 2].to(dtype=torch.float64)

@@ -1,0 +1,6 @@
+MODEL: "Elasticity_2D"
+MATPROP:
+  is_plane_strain: 1
+  E: 3.0e+7
+  mu: 0.3
+  rho: 0.00073

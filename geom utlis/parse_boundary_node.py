@@ -24,14 +24,19 @@ def parse_and_filter_nodes(mesh_lines, x_value=None, y_value=None, z_value=None,
     filtered_nodes = []
     for line in mesh_lines[nodes_start:]:
         parts = line.split()
-        if len(parts) < 4:  # skip any line that does not have at least 4 entries (x, y, z, index)
-            continue
-        x, y, z, index = float(parts[0]), float(parts[1]), float(parts[2]), int(parts[3])
-        conditions = [
-            (x_value is None or abs(x - x_value) <= tolerance),
-            (y_value is None or abs(y - y_value) <= tolerance),
-            (z_value is None or abs(z - z_value) <= tolerance)
-        ]
+        if len(parts) < 4:  # 2d case (x, y, z, index)
+            x, y, index = float(parts[0]), float(parts[1]), float(parts[2])
+            conditions = [
+                (x_value is None or abs(x - x_value) <= tolerance),
+                (y_value is None or abs(y - y_value) <= tolerance),
+            ]
+        else:
+            x, y, z, index = float(parts[0]), float(parts[1]), float(parts[2]), int(parts[3])
+            conditions = [
+                (x_value is None or abs(x - x_value) <= tolerance),
+                (y_value is None or abs(y - y_value) <= tolerance),
+                (z_value is None or abs(z - z_value) <= tolerance)
+            ]
         if all(conditions):
             filtered_nodes.append(index)
 
@@ -39,7 +44,7 @@ def parse_and_filter_nodes(mesh_lines, x_value=None, y_value=None, z_value=None,
 
 
 
-su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw4_Problem3_3d/brick_3d.su2'
+su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw4_Problem4/rectangle_q4.su2'
 with open(su2_filepath, 'r') as file:
     mesh_data = file.readlines()
 # Apply the function to the mesh data with different filter conditions
@@ -52,8 +57,8 @@ nodes_at_x10 = parse_and_filter_nodes(mesh_data, x_value=10)
 nodes_at_y10 = parse_and_filter_nodes(mesh_data, y_value=10)
 nodes_at_z10 = parse_and_filter_nodes(mesh_data, z_value=0.1)
 
-nodes_union = list(set(nodes_at_x0) | set(nodes_at_y0) | set(nodes_at_x20) | set(nodes_at_y20))
-
+nodes_union = list(set(nodes_at_x0) )
+print(nodes_union)
 node_interaction = list(set(nodes_at_x10) & set(nodes_at_y10) & set(nodes_at_z10))
 print(node_interaction)
 print('node_union:', nodes_union)
