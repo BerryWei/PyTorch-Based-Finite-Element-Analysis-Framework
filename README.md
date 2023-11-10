@@ -37,13 +37,14 @@ Introducing a framework designed for Finite Element Analysis (FEA) with PyTorch 
    python main.py --device cuda --geometry_path geometry.yaml --material_path material.yaml --loading_path loading.yaml 
 ```
 
-## Example
+## Visualization
 
 
    - von Mises stress
 <div style="text-align: center">
     <img src="./example/hw4_Problem3_3d/von_mises.png" alt="Sample GIF" width="600" height="480">
 </div>
+
 ## Prerequisites
 
 - Python (version 3.8 or higher)
