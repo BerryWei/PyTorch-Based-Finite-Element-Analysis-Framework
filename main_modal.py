@@ -86,21 +86,21 @@ def post_processing(model):
     Perform post-processing steps.
     """
     logger.info("Post-processing...")
-    model.compute_GP_strains_stresses()
+    # model.compute_GP_strains_stresses()
 
 
 
-    node_strains = interpolate_to_nodes(
-        input_coor=model.gauss_point_coordinates.cpu().numpy(),
-        input_attribute=model.gauss_point_strains.cpu().numpy(),
-        target_coor=model.node_coords.cpu().numpy()
-    )
+    # node_strains = interpolate_to_nodes(
+    #     input_coor=model.gauss_point_coordinates.cpu().numpy(),
+    #     input_attribute=model.gauss_point_strains.cpu().numpy(),
+    #     target_coor=model.node_coords.cpu().numpy()
+    # )
 
-    node_stresses = interpolate_to_nodes(
-        input_coor=model.gauss_point_coordinates.cpu().numpy(),
-        input_attribute=model.gauss_point_stresses.cpu().numpy(),
-        target_coor=model.node_coords.cpu().numpy()
-    )
+    # node_stresses = interpolate_to_nodes(
+    #     input_coor=model.gauss_point_coordinates.cpu().numpy(),
+    #     input_attribute=model.gauss_point_stresses.cpu().numpy(),
+    #     target_coor=model.node_coords.cpu().numpy()
+    # )
 
     model_cell_types = get_vtk_cell_type(
         model.elementClass.node_per_element,
@@ -113,15 +113,21 @@ def post_processing(model):
         disp_dict = {
             'disp_x' : model.global_displacements[0::2],
             'disp_y' : model.global_displacements[1::2],
+            'mode1_x' : model.global_displacements_mod[0::2, 0],
+            'mode1_y' : model.global_displacements_mod[1::2, 0],
+            'mode2_x' : model.global_displacements_mod[0::2, 1],
+            'mode2_y' : model.global_displacements_mod[1::2, 1],
+            'mode3_x' : model.global_displacements_mod[0::2, 2],
+            'mode3_y' : model.global_displacements_mod[1::2, 2],
         }
-        strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
-        stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
+        # strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
+        # stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
         
-        # compute von Mises stress in 2D
-        stress11 = stress_components['stress11']
-        stress22 = stress_components['stress22']
-        stress12 = stress_components['stress12']
-        von_mises_stress = np.sqrt(stress11**2 - stress11*stress22 + stress22**2 + 3*stress12**2)
+        # # compute von Mises stress in 2D
+        # stress11 = stress_components['stress11']
+        # stress22 = stress_components['stress22']
+        # stress12 = stress_components['stress12']
+        # von_mises_stress = np.sqrt(stress11**2 - stress11*stress22 + stress22**2 + 3*stress12**2)
 
     else:
         node_coords_3d = model.node_coords.cpu().numpy()
@@ -131,43 +137,41 @@ def post_processing(model):
             'disp_z' : model.global_displacements[2::3],
         }
 
-        strain_components = {
-            'strain11': node_strains[:, 0],
-            'strain22': node_strains[:, 1],
-            'strain33': node_strains[:, 2],
-            'strain23': node_strains[:, 3],
-            'strain13': node_strains[:, 4],
-            'strain12': node_strains[:, 5]
-        }
-        stress_components = {
-            'stress11': node_stresses[:, 0],
-            'stress22': node_stresses[:, 1],
-            'stress33': node_stresses[:, 2],
-            'stress23': node_stresses[:, 3],
-            'stress13': node_stresses[:, 4],
-            'stress12': node_stresses[:, 5]
-        }
+        # strain_components = {
+        #     'strain11': node_strains[:, 0],
+        #     'strain22': node_strains[:, 1],
+        #     'strain33': node_strains[:, 2],
+        #     'strain23': node_strains[:, 3],
+        #     'strain13': node_strains[:, 4],
+        #     'strain12': node_strains[:, 5]
+        # }
+        # stress_components = {
+        #     'stress11': node_stresses[:, 0],
+        #     'stress22': node_stresses[:, 1],
+        #     'stress33': node_stresses[:, 2],
+        #     'stress23': node_stresses[:, 3],
+        #     'stress13': node_stresses[:, 4],
+        #     'stress12': node_stresses[:, 5]
+        # }
 
-        # Compute von Mises stress for 3D
-        stress11 = stress_components['stress11']
-        stress22 = stress_components['stress22']
-        stress33 = stress_components['stress33']
-        stress12 = stress_components['stress12']
-        stress13 = stress_components['stress13']
-        stress23 = stress_components['stress23']
-        von_mises_stress = np.sqrt(
-            0.5 * ((stress11 - stress22)**2 + (stress22 - stress33)**2 + (stress33 - stress11)**2) +
-            3 * (stress12**2 + stress13**2 + stress23**2)
-        )
+        # # Compute von Mises stress for 3D
+        # stress11 = stress_components['stress11']
+        # stress22 = stress_components['stress22']
+        # stress33 = stress_components['stress33']
+        # stress12 = stress_components['stress12']
+        # stress13 = stress_components['stress13']
+        # stress23 = stress_components['stress23']
+        # von_mises_stress = np.sqrt(
+        #     0.5 * ((stress11 - stress22)**2 + (stress22 - stress33)**2 + (stress33 - stress11)**2) +
+        #     3 * (stress12**2 + stress13**2 + stress23**2)
+        # )
     
 
 
 
     point_data = {
-        **stress_components,
-        **strain_components,
         **disp_dict,
-        'von_mises_stress': von_mises_stress
+        
     }
 
     parent_folder = args.geometry_path.parent

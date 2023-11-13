@@ -549,24 +549,15 @@ class FiniteElementModel:
 
         nmodrbm = 3 if self.parameters['num_dimensions'] == 2 else 6
 
-        Nmode=10
+        Nmode=3
         self.global_displacements_mod = torch.zeros(self.num_dofs, Nmode,  device=self.device).to(dtype=torch.float64)
 
-        M_sub_sqrt_inv
-        
-
-        # Solve the system
-        u_sub = torch.linalg.solve(K_sub, R_sub.unsqueeze(1))
-        residual = R_sub - K_sub @ u_sub.squeeze()
-        relative_residual_error = torch.norm(residual) / torch.norm(R_sub)
-        print(f"Relative Residual Error: {relative_residual_error.item():.8f}")
+        self.global_displacements_mod[unknown_dof_indices] = M_sub_sqrt_inv @ Q_sorted[:,:Nmode]
 
 
 
-        # Create a global displacement vector
         self.global_displacements = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
-        self.global_displacements[unknown_dof_indices] = u_sub.squeeze()
-
+        self.global_displacements = torch.sum(self.global_displacements_mod, dim=1)
         # Fill known displacements, if any
         if self.node_dof_disp.numel() > 0:
             self.global_displacements[known_dof_indices] = self.node_dof_disp[:, 2].to(dtype=torch.float64)
