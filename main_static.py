@@ -59,7 +59,7 @@ def run_analysis(model):
 
     model.init_element_class()
     model.generate_material_dict()
-
+    args.incompatible_mode_element = True
     if args.incompatible_mode_element == True:
         model.compute_element_stiffness_with_shear_locking()
     else:
@@ -188,9 +188,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cpu', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\example\hw4_Problem3_3d\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\example\hw4_Problem3_3d\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\example\hw4_Problem3_3d\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\example\hw4_Problem3_3d_finerMesh\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\example\hw4_Problem3_3d_finerMesh\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\example\hw4_Problem3_3d_finerMesh\loading.yaml', help='Path to the loading.yaml file.')
     parser.add_argument('--incompatible_mode_element', action='store_true', help='Flag to enable incompatible mode for the element.')
     args = parser.parse_args()
     main(args)

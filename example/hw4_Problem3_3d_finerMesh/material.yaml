@@ -1,0 +1,4 @@
+MODEL: "Elasticity_3D"
+MATPROP:
+  E: 30.0e+6
+  mu: 0.3

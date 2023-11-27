@@ -149,6 +149,20 @@ class FiniteElementModel:
         # Initialize the global load vector to zero
         self.global_load = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
 
+        # Identify known DOFs from self.node_dof_disp
+        if self.node_dof_disp.numel() > 0:
+            known_dof_indices = (self.node_dof_disp[:, 0] * self.parameters['num_dimensions'] + self.node_dof_disp[:, 1]).long()
+        else:
+            known_dof_indices = torch.tensor([], dtype=torch.long, device=self.device)
+        # Identify unknown DOFs
+        all_dofs = torch.arange(self.num_dofs, device=self.device)
+        unknown_dof_indices = torch.tensor([idx for idx in all_dofs if idx not in known_dof_indices], device=self.device)
+
+        # Extract submatrix and subvector
+        # K_unknown_unknown = self.global_stiffness[unknown_dof_indices, :][:, unknown_dof_indices]
+        K_known_known = self.global_stiffness[known_dof_indices, :][:, known_dof_indices]
+        K_unknown_known = self.global_stiffness[unknown_dof_indices, :][:, known_dof_indices]
+
         if self.node_dof_disp.numel() > 0:
             # Incorporate prescribed displacements into the global load vector using vectorized operations
             node_indices = self.node_dof_disp[:, 0].long()
@@ -156,7 +170,7 @@ class FiniteElementModel:
             values = self.node_dof_disp[:, 2].to(dtype=torch.float64)
 
             global_dof_indices = node_indices * self.parameters['num_dimensions'] + dof_indices
-            self.global_load.index_add_(dim=0, index=global_dof_indices, source=values)
+            self.global_load.index_add_(dim=0, index=global_dof_indices, source= - K_known_known @ values)
 
         if self.node_dof_forces.numel() > 0:
             # Incorporate nodal forces into the global load vector using vectorized operations
@@ -165,6 +179,8 @@ class FiniteElementModel:
             force_values = self.node_dof_forces[:, 2].to(dtype=torch.float64)
             force_global_dof_indices = force_node_indices * self.parameters['num_dimensions'] + force_dof_indices
             self.global_load.index_add_(0, force_global_dof_indices, force_values)
+
+        self.global_load[unknown_dof_indices] += -K_unknown_known @ values
 
 
         # Incorporate tractions into the global load vector
@@ -377,7 +393,7 @@ class FiniteElementModel:
 
         
 
-        for i in range(self.num_element):
+        for i in tqdm(range(self.num_element), desc='Computing Stiffness Matrix'):
             elem_nodes = self.element_node_indices[i]
             node_coords = self.node_coords[elem_nodes].type(torch.float64)
 
@@ -419,11 +435,26 @@ class FiniteElementModel:
                 
 
                 B_matrix = self.elementClass.compute_B_matrix(dN_dxi, J, device=self.device)
-                append_matrix = torch.tensor([
-                    [detJ0/detJ*gauss_point[0]*invJ[0,0], 0, detJ0/detJ*gauss_point[1]*invJ[1,0], 0],
-                    [0, detJ0/detJ*gauss_point[0]*invJ[0,1], 0, detJ0/detJ*gauss_point[1]*invJ[1,1]], 
-                    [detJ0/detJ*gauss_point[0]*invJ[0,1], detJ0/detJ*gauss_point[0]*invJ[0,0], detJ0/detJ*gauss_point[1]*invJ[1,1], detJ0/detJ*gauss_point[1]*invJ[1,0]]
-                ],device=self.device).to(dtype=torch.float64)
+                if n_dim ==2: # append_matrix.shape = (3, 4)
+                    append_matrix = torch.tensor([
+                        [detJ0/detJ*gauss_point[0]*invJ[0,0], 0, detJ0/detJ*gauss_point[1]*invJ[1,0], 0],
+                        [0, detJ0/detJ*gauss_point[0]*invJ[0,1], 0, detJ0/detJ*gauss_point[1]*invJ[1,1]], 
+                        [detJ0/detJ*gauss_point[0]*invJ[0,1], detJ0/detJ*gauss_point[0]*invJ[0,0], detJ0/detJ*gauss_point[1]*invJ[1,1], detJ0/detJ*gauss_point[1]*invJ[1,0]]
+                    ],device=self.device).to(dtype=torch.float64)
+
+                elif n_dim ==3: # append_matrix.shape = (6, 9)
+                    append_matrix = torch.tensor([
+                        [detJ0/detJ*gauss_point[0]*invJ[0,0], 0, 0, detJ0/detJ*gauss_point[1]*invJ[1,0], 0, 0, detJ0/detJ*gauss_point[2]*invJ[2,0], 0, 0],
+                        [0, detJ0/detJ*gauss_point[0]*invJ[0,1], 0, 0, detJ0/detJ*gauss_point[1]*invJ[1,1], 0, 0, detJ0/detJ*gauss_point[2]*invJ[2,1], 0],
+                        [0, 0, detJ0/detJ*gauss_point[0]*invJ[0,2], 0, 0, detJ0/detJ*gauss_point[1]*invJ[1,2], 0, 0, detJ0/detJ*gauss_point[2]*invJ[2,2]],
+                        [0, detJ0/detJ*gauss_point[0]*invJ[0,2], detJ0/detJ*gauss_point[0]*invJ[0,1], 0, detJ0/detJ*gauss_point[1]*invJ[1,2], detJ0/detJ*gauss_point[1]*invJ[1,1], 0, detJ0/detJ*gauss_point[2]*invJ[2,2], detJ0/detJ*gauss_point[2]*invJ[2,1]],
+                        [detJ0/detJ*gauss_point[0]*invJ[0,2], 0, detJ0/detJ*gauss_point[0]*invJ[0,0], detJ0/detJ*gauss_point[1]*invJ[1,2], 0, detJ0/detJ*gauss_point[1]*invJ[1,0], detJ0/detJ*gauss_point[2]*invJ[2,2], 0, detJ0/detJ*gauss_point[2]*invJ[2,0],],
+                        [detJ0/detJ*gauss_point[0]*invJ[0,1], detJ0/detJ*gauss_point[0]*invJ[0,0], 0, detJ0/detJ*gauss_point[1]*invJ[1,1], detJ0/detJ*gauss_point[1]*invJ[1,0], 0, detJ0/detJ*gauss_point[2]*invJ[2,1], detJ0/detJ*gauss_point[2]*invJ[2,0], 0],
+                        
+                    ],device=self.device).to(dtype=torch.float64)
+
+                else:
+                    raise ValueError(f"Problem dimension {n_dim} is not an allowed value.")
                 B_matrix_revised = torch.cat((B_matrix, append_matrix), dim=1)
                 D_matrix = self.material_dict[(i, j)].consistent_tangent().type(torch.float64)
 
@@ -561,3 +592,158 @@ class FiniteElementModel:
         # Fill known displacements, if any
         if self.node_dof_disp.numel() > 0:
             self.global_displacements[known_dof_indices] = self.node_dof_disp[:, 2].to(dtype=torch.float64)
+
+
+class FiniteElementModel_dynamic_Newmark(FiniteElementModel):
+    def __init__(self, device: str='cuda') -> None:
+        super().__init__(self)
+
+    def compute_acc_t0(self, u0_func, externalForcefunc) -> None:
+        """ Compute the self.global_acc_t0 """
+
+        u0 = u0_func(self.node_coords, self.device)
+        
+        self.u_prev = u0
+        self.v_prev = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+        self.mkpres = self.global_mass_matrix + 0.5 *self.beta2*self.dt*self.dt * self.global_stiffness
+
+        #self.a_prev = self.global_mass_matrix.inverse() @ (-self.global_stiffness @ u0 + self.global_load)
+        
+        # sub matrix
+        #############
+        # Identify known DOFs from self.node_dof_disp
+        if self.node_dof_disp.numel() > 0:
+            known_dof_indices = (self.node_dof_disp[:, 0] * self.parameters['num_dimensions'] + self.node_dof_disp[:, 1]).long()
+        else:
+            known_dof_indices = torch.tensor([], dtype=torch.long, device=self.device)
+        # Identify unknown DOFs
+        all_dofs = torch.arange(self.num_dofs, device=self.device)
+        unknown_dof_indices = torch.tensor([idx for idx in all_dofs if idx not in known_dof_indices], device=self.device)
+
+        # Extract submatrix and subvector
+        mkpres_sub = self.mkpres[unknown_dof_indices, :][:, unknown_dof_indices]
+        stiffness_sub = self.global_stiffness[unknown_dof_indices, :][:, unknown_dof_indices]
+        
+        u0_sub = u0[unknown_dof_indices]
+        global_load_sub = self.global_load[unknown_dof_indices]
+
+        A = mkpres_sub
+        B = (-1*stiffness_sub @u0_sub + global_load_sub)
+        x_sub = torch.linalg.lstsq(A, B).solution
+
+        self.a_prev = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+        self.a_prev[unknown_dof_indices] = x_sub
+        
+
+        # consider prescribed acc. for boundary condition
+        if self.node_dof_disp.numel() > 0: # FIXED only
+            # Incorporate prescribed displacements into the global load vector using vectorized operations
+            node_indices = self.node_dof_disp[:, 0].long()
+            dof_indices = self.node_dof_disp[:, 1].long()
+            values = self.node_dof_disp[:, 2].to(dtype=torch.float64)
+
+            global_dof_indices = node_indices * self.parameters['num_dimensions'] + dof_indices
+            self.a_prev.index_add_(dim=0, index=global_dof_indices, source=values)
+
+        self.global_displacements = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+        self.global_displacements = u0
+
+
+
+    def assemble_global_load_vector_dynamic(self, externalForcefunc, t) -> None:
+        """
+        Assemble the global load vector R from the prescribed displacements and tractions.
+        """
+        # Initialize the global load vector to zero
+        self.global_load = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+
+        # Identify known DOFs from self.node_dof_disp
+        if self.node_dof_disp.numel() > 0:
+            known_dof_indices = (self.node_dof_disp[:, 0] * self.parameters['num_dimensions'] + self.node_dof_disp[:, 1]).long()
+        else:
+            known_dof_indices = torch.tensor([], dtype=torch.long, device=self.device)
+        # Identify unknown DOFs
+        all_dofs = torch.arange(self.num_dofs, device=self.device)
+        unknown_dof_indices = torch.tensor([idx for idx in all_dofs if idx not in known_dof_indices], device=self.device)
+
+        # Extract submatrix and subvector
+        # K_unknown_unknown = self.global_stiffness[unknown_dof_indices, :][:, unknown_dof_indices]
+        K_known_known = self.global_stiffness[known_dof_indices, :][:, known_dof_indices]
+        K_unknown_known = self.global_stiffness[unknown_dof_indices, :][:, known_dof_indices]
+
+        if self.node_dof_disp.numel() > 0:
+            # Incorporate prescribed displacements into the global load vector using vectorized operations
+            node_indices = self.node_dof_disp[:, 0].long()
+            dof_indices = self.node_dof_disp[:, 1].long()
+            values = self.node_dof_disp[:, 2].to(dtype=torch.float64)
+
+            global_dof_indices = node_indices * self.parameters['num_dimensions'] + dof_indices
+            self.global_load.index_add_(dim=0, index=global_dof_indices, source= - K_known_known @ values)
+
+        forces = externalForcefunc(self.node_coords, t=t, device=self.device)
+        self.global_load[::2] += forces[:, 0]
+        self.global_load[1::2] += forces[:, 1]
+            
+
+        if self.node_dof_forces.numel() > 0:
+            # Incorporate nodal forces into the global load vector using vectorized operations
+            force_node_indices = self.node_dof_forces[:, 0].long()
+            force_dof_indices = self.node_dof_forces[:, 1].long()
+            force_values = self.node_dof_forces[:, 2].to(dtype=torch.float64)
+            force_global_dof_indices = force_node_indices * self.parameters['num_dimensions'] + force_dof_indices
+            self.global_load.index_add_(0, force_global_dof_indices, force_values)
+
+        self.global_load[unknown_dof_indices] += -K_unknown_known @ values
+
+    def solve_system_dynamic(self):
+        """
+        Solve the global system of equations to get the nodal displacements.
+        """
+
+        # Identify known DOFs from self.node_dof_disp
+        if self.node_dof_disp.numel() > 0:
+            known_dof_indices = (self.node_dof_disp[:, 0] * self.parameters['num_dimensions'] + self.node_dof_disp[:, 1]).long()
+        else:
+            known_dof_indices = torch.tensor([], dtype=torch.long, device=self.device)
+        # Identify unknown DOFs
+        all_dofs = torch.arange(self.num_dofs, device=self.device)
+        unknown_dof_indices = torch.tensor([idx for idx in all_dofs if idx not in known_dof_indices], device=self.device)
+
+        # Extract submatrix and subvector
+        K_sub = self.global_stiffness[unknown_dof_indices, :][:, unknown_dof_indices]
+        mkpres_sub = self.mkpres[unknown_dof_indices, :][:, unknown_dof_indices]
+        R_sub = self.global_load[unknown_dof_indices]
+
+        a_prev_sub = self.a_prev[unknown_dof_indices]
+        v_prev_sub = self.v_prev[unknown_dof_indices]
+        u_prev_sub = self.u_prev[unknown_dof_indices]
+
+        
+        # a_current_sub = mkpres_sub.inverse() @ (R_sub - K_sub @ (u_prev_sub + 
+        #                                               self.dt*v_prev_sub+
+        #                                               self.dt*self.dt/2*(1-self.beta2) * a_prev_sub))
+        A = mkpres_sub
+        B = (R_sub - K_sub @ (u_prev_sub + 
+                            self.dt*v_prev_sub+
+                            self.dt*self.dt/2*(1-self.beta2) * a_prev_sub))
+        a_current_sub = torch.linalg.lstsq(A, B).solution
+        
+        
+        v_current_sub = v_prev_sub + self.dt*((1.-self.beta1)*a_prev_sub + self.beta1*a_current_sub)
+
+        u_current_sub = u_prev_sub + self.dt*v_prev_sub + self.dt*self.dt/2*((1.-self.beta2)*a_prev_sub + self.beta2*a_current_sub)
+
+
+        # Create a global displacement vector
+        self.global_displacements = torch.zeros(self.num_dofs, device=self.device).to(dtype=torch.float64)
+        self.global_displacements[unknown_dof_indices] = u_current_sub.squeeze()
+
+        # Fill known displacements, if any
+        if self.node_dof_disp.numel() > 0:
+            self.global_displacements[known_dof_indices] = self.node_dof_disp[:, 2].to(dtype=torch.float64)
+
+        # update the self.a_prev...
+
+        self.a_prev[unknown_dof_indices] = a_current_sub.squeeze()
+        self.v_prev[unknown_dof_indices] = v_current_sub.squeeze()
+        self.u_prev[unknown_dof_indices] = u_current_sub.squeeze()
