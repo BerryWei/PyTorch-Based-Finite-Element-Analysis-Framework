@@ -106,7 +106,7 @@ def run_analysis(model):
     
     def u0_problem3(node_coords: torch.Tensor, device)->torch.Tensor:
         E = 130.0e+9
-        A = 0.03
+        A = 0.03*0.03
         F0=1
         n_nodes, n_dim = node_coords.shape[0], node_coords.shape[1]
         output = torch.zeros(n_nodes*n_dim, dtype=torch.float64, device=device)
@@ -121,7 +121,7 @@ def run_analysis(model):
     #     return forces
     
     def externalForcefunc(x: torch.Tensor, t: float, device) -> torch.Tensor:
-        P0 = 10/0.03
+        P0 = 10
         w = 1446.99
         
         forceY = P0 * torch.sin(torch.tensor(w * t))
@@ -311,9 +311,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cpu', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\example\hw5_Problem2\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\example\hw5_Problem2\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\example\hw5_Problem2\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\example\hw5_Problem3\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\example\hw5_Problem3\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\example\hw5_Problem3\loading.yaml', help='Path to the loading.yaml file.')
     parser.add_argument('--incompatible_mode_element', action='store_true', help='Flag to enable incompatible mode for the element.')
     parser.add_argument('--beta1', type=float, default=0.5, help='Newmark integration parameter for controlling time integration accuracy. A value of 0.5 corresponds to the linear variation of acceleration scheme.')
     parser.add_argument('--beta2', type=float, default=0.5, help='Newmark integration parameter for controlling numerical damping. A typical value is 1/3 for linear variation of acceleration scheme.')

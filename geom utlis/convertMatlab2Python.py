@@ -1,6 +1,7 @@
 import yaml
+from decimal import Decimal
 
-with open(r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem3_b\hw3-3-b", "r") as file:
+with open(r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw7_Problem1\hw7-1", "r") as file:
     hw1_1_content = file.read()
 # Splitting the content into sections
 sections = [section.strip() for section in hw1_1_content.split('*') if section.strip()]
@@ -25,6 +26,10 @@ for section in sections:
         num_node = int(content[0].split(":")[1].strip())
         coord_lines = content[2:2+num_node]
         coords = [list(map(float, line.split())) for line in coord_lines]
+
+
+
+        
         data["NODE"] = {
             "num-node": num_node,
             "nodal-coord": coords
@@ -41,7 +46,7 @@ for section in sections:
             "num-elem": num_elem,
             "num-elem-node": num_elem_node,
             "elem-conn": elems_adjusted,
-            "type": "TriangularElement"
+            "type": "T3Element"
         }
 
     elif header == "BOUNDARY":
@@ -69,7 +74,7 @@ for section in sections:
 
 
 # Saving the converted data to input.yaml
-output_path = r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\hw3_Problem3_b/geometry.yaml"
+output_path = r"D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw7_Problem1/geometry.yaml"
 with open(output_path, "w") as f:
     yaml.dump(data, f, default_flow_style=None)
 

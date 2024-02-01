@@ -2,7 +2,9 @@ import numpy as np
 from scipy.interpolate import Rbf
 from tqdm import tqdm
 from multiprocessing import Pool
-
+import torch
+from typing import Union
+from torch import Tensor
 
 def interpolate_to_nodes(input_coor, input_attribute, target_coor):
     """
@@ -26,15 +28,54 @@ def interpolate_to_nodes(input_coor, input_attribute, target_coor):
     node_attributes = np.zeros((num_nodes, num_attr_components))
     
     if dimensionality == 2:
-        for d in tqdm(range(num_attr_components), desc="Interpolating"):
+        for d in range(num_attr_components):
+        #for d in tqdm(range(num_attr_components), desc="Interpolating"):
             rbf = Rbf(flattened_input_coor[:, 0], flattened_input_coor[:, 1],
-                    flattened_input_attribute[:, d], function='multiquadric', smooth=1e-9)
+                    flattened_input_attribute[:, d], function='linear', smooth=1e-9)
             node_attributes[:, d] = rbf(target_coor[:, 0], target_coor[:, 1])
     elif dimensionality == 3:
-        for d in tqdm(range(num_attr_components), desc="Interpolating"):
+        for d in range(num_attr_components):
+        #for d in tqdm(range(num_attr_components), desc="Interpolating"):
             rbf = Rbf(flattened_input_coor[:, 0], flattened_input_coor[:, 1], flattened_input_coor[:, 2],
                     flattened_input_attribute[:, d], function='multiquadric', smooth=1e-9)
             node_attributes[:, d] = rbf(target_coor[:, 0], target_coor[:, 1], target_coor[:, 2])
+    else:
+        raise ValueError("The input coordinate dimension is neither 2D nor 3D.")
+
+    return node_attributes
+
+
+def interpolate_to_nodes_for_single_element(input_coor, input_attribute, target_coor):
+    """
+    Interpolate values from Gauss points to nodes using Radial Basis Function (RBF) interpolation.
+    This function is dimensionality-agnostic and can handle both 2D and 3D cases.
+    
+    :param input_coor: A 2D array of Gauss points coordinates.
+    :param input_attribute: A 2D array of attributes (strains or stresses) at the Gauss points.
+    :param target_coor: A 2D array of node coordinates where the values are to be interpolated.
+    :return: A 2D array of interpolated attribute values at the node coordinates.
+    """
+    flattened_input_coor = input_coor.reshape(-1, input_coor.shape[-1])
+    flattened_input_attribute = input_attribute.reshape(-1, input_attribute.shape[-1])
+    # Determine if we are working with 2D or 3D
+    dimensionality = input_coor.shape[-1]
+    
+
+    # Initialize node attributes
+    num_nodes = target_coor.shape[0]
+    num_attr_components = flattened_input_attribute.shape[1]
+    node_attributes = np.zeros((num_nodes, num_attr_components))
+    
+    if dimensionality == 2:
+        for d in range(num_attr_components):
+            _average = np.average(flattened_input_attribute[:, d])
+            node_attributes[:, d] = _average
+    elif dimensionality == 3:
+        for d in range(num_attr_components):
+            
+            _average = np.average(flattened_input_attribute[:, d])
+            node_attributes[:, d] = _average
+            
     else:
         raise ValueError("The input coordinate dimension is neither 2D nor 3D.")
 
@@ -132,3 +173,87 @@ def add_zero_z_coordinate(node_coords):
     return new_node_coords
 
 
+
+
+def Vec2Mat_Vogit(stressVector, dtype=torch.float64, device='cpu'):
+    """
+    Convert a stress vector to a stress matrix in Voigt notation.
+
+    Parameters:
+    stressVector (Tensor): A stress vector (3 elements for 2D, 6 elements for 3D).
+    dtype (torch.dtype): Data type of the output tensor.
+    device (string): The device on which the tensor will be allocated.
+
+    Returns:
+    Tensor: A 2D or 3D stress matrix.
+    """
+    dim = len(stressVector)
+    
+    if dim == 3:
+        output = torch.zeros((2, 2), dtype=dtype, device=device)
+        output[0, 0] = stressVector[0]
+        output[1, 1] = stressVector[1]
+        output[0, 1] = output[1, 0] = stressVector[2]
+    elif dim == 6:
+        output = torch.zeros((3, 3), dtype=dtype, device=device)
+        output[0, 0], output[1, 1], output[2, 2] = stressVector[0:3]
+        output[0, 1] = output[1, 0] = stressVector[5]
+        output[1, 2] = output[2, 1] = stressVector[3]
+        output[0, 2] = output[2, 0] = stressVector[4]
+        
+    else:
+        raise ValueError("Stress vector must have 3 (2D) or 6 (3D) elements.")
+    
+    return output
+
+def Mat2Vec_Vogit(stressMatrix: torch.Tensor, dtype: torch.dtype = torch.float64, device: Union[str, torch.device] = 'cpu') -> torch.Tensor:
+    """
+    Convert a stress matrix to a stress vector in Voigt notation.
+
+    Parameters:
+    stressMatrix (torch.Tensor): A stress matrix (2x2 for 2D, 3x3 for 3D).
+    dtype (torch.dtype): Data type of the output tensor.
+    device (Union[str, torch.device]): The device on which the tensor will be allocated.
+
+    Returns:
+    torch.Tensor: A stress vector (3 elements for 2D, 6 elements for 3D).
+    """
+    rows, cols = stressMatrix.shape
+
+    if rows == cols == 2:  # 2D case
+        vector_length = 3
+        output = torch.zeros(vector_length, dtype=dtype, device=device)
+        output[0] = stressMatrix[0, 0]
+        output[1] = stressMatrix[1, 1]
+        output[2] = stressMatrix[0, 1]  # Assuming a symmetric matrix, so 0,1 and 1,0 are the same
+    elif rows == cols == 3:  # 3D case
+        vector_length = 6
+        output = torch.zeros(vector_length, dtype=dtype, device=device)
+        output[0], output[1], output[2] = stressMatrix[0, 0], stressMatrix[1, 1], stressMatrix[2, 2] 
+        output[5], output[3], output[4] = stressMatrix[0, 1], stressMatrix[1, 2], stressMatrix[0, 2]  
+    else:
+        raise ValueError("Stress matrix must be 2x2 (2D) or 3x3 (3D).")
+
+    return output
+
+
+def sym3333_to_m66(m3333:Tensor, notationMap:Tensor, symmetrise:bool) -> Tensor:
+	"""
+	Reduce symmetric 3x3x3x3 tensor to 6x6 tensor following `notationMap(default=IMP)` notation.
+
+	Args:
+		m3333: The 3x3x3x3 tensor. m3333.shape == (3, 3, 3, 3).
+		notationMap: The tensor notation map.
+
+	Returns:
+		The 6x6 tensor.
+	"""
+	m66 = m3333.new_zeros((6,6))
+	for i in range(6):
+		for j in range(6):
+			m66[i,j] = m3333[notationMap[0,i], notationMap[1,i], notationMap[0,j], notationMap[1,j]]
+
+	if symmetrise:
+		m66 = (m66 + m66.t()) / 2
+		
+	return m66

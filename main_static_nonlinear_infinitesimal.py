@@ -1,11 +1,12 @@
 import torch
 from pathlib import Path
-from utlis.fem_module import FiniteElementModel
+from utlis.fem_module import FiniteElementModel_nonlinear
 from utlis.element import *
 import argparse
 import time
 import logging
 from utlis.function import *
+import matplotlib.pyplot as plt
 
 def get_loggings(ckpt_dir: Path):
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -34,7 +35,7 @@ def initialize_model(args):
     Initialize the Finite Element Model and load data.
     """
     logger.info("Initializing the Finite Element Model...")
-    model = FiniteElementModel()
+    model = FiniteElementModel_nonlinear()
 
     logger.info(f"Reading geometry data from {args.geometry_path}...")
     model.read_geom_from_yaml(args.geometry_path)
@@ -55,28 +56,62 @@ def run_analysis(model):
     Run the FEM analysis.
     """
     start_time = time.time()
-    logger.info("Computing the element stiffness...")
 
+    # init material class
     model.init_element_class()
     model.generate_material_dict()
-    if args.incompatible_mode_element == True:
-        model.compute_element_stiffness_with_shear_locking()
-    else:
-        model.compute_element_stiffness()
-    logger.info("Assembling the element stiffness...")
-    model.assemble_global_stiffness()
-    model.assemble_global_load_vector()
+    
+    # init temporay 
+    model.init_global_displacements_temp()
+
+    for step in range(args.nLoad+1):
+        factor = (step)/args.nLoad
+        iter = 0
+        error = float('inf')
+        
+        print(f'step = {step}/{args.nLoad}, factor = {factor}')
+        # Newton-Rapshon start
+        while (iter < 1.0e+2 and error > 1.0e-7):
+            iter += 1
+
+            model.update_prescribed_global_displacements_temp(factor=factor)
+
+            # compute stiffness matrix
+            if args.incompatible_mode_element == True:
+                model.compute_element_stiffness_with_shear_locking()
+            else:
+                #model.compute_element_stiffness_nonlinear()
+                model.compute_element_stiffness_nonlinear_multicore(num_cores=32)
+            model.assemble_global_stiffness()
+
+            model.compute_element_residual()
+            model.assemble_global_residual()
+            model.assemble_global_load_vector_nonlinear(factor)
+
+            model.solve_system_nonlinear()
+            error = torch.norm(model.u_incr_sub, float('inf'))
+            print(f'\titer={iter} error = {error}')
+            # Store iteration and error for plotting
+
+            
+
+        # self.global_displacements_temp <-- self.global_displacements for printing
+        model.update_displacement()
+
+        if (step % args.nPrint == 0):
+            post_processing(model, step)
 
 
-    logger.info("Solving...")
-    model.solve_system()
+
+
+
 
     end_time = time.time()
     total_time = end_time - start_time
     logger.info(f"Finite Element Model execution completed in {total_time:.2f} seconds.")
 
 
-def post_processing(model):
+def post_processing(model, step:int):
     """
     Perform post-processing steps.
     """
@@ -102,12 +137,20 @@ def post_processing(model):
         model.parameters['num_dimensions']
     )
 
+    model.recoverError()
+    abs_u_incr = model.global_abs_u_incr.cpu()
+
+
+
+
     if model.parameters['num_dimensions']==2:
         # Convert 2D node coordinates to 3D by adding a zero z-coordinate
         node_coords_3d = add_zero_z_coordinate(model.node_coords.cpu().numpy())
         disp_dict = {
             'disp_x' : model.global_displacements[0::2],
             'disp_y' : model.global_displacements[1::2],
+            'abs_disp_x': abs_u_incr[0::2],
+            'abs_disp_y': abs_u_incr[1::2]
         }
         strain_components = {'strain11': node_strains[:, 0], 'strain22': node_strains[:, 1], 'strain12': node_strains[:, 2]}
         stress_components = {'stress11': node_stresses[:, 0], 'stress22': node_stresses[:, 1], 'stress12': node_stresses[:, 2]}
@@ -124,6 +167,9 @@ def post_processing(model):
             'disp_x' : model.global_displacements[0::3],
             'disp_y' : model.global_displacements[1::3],
             'disp_z' : model.global_displacements[2::3],
+            'abs_disp_x': abs_u_incr[0::3],
+            'abs_disp_y': abs_u_incr[1::3],
+            'abs_disp_z': abs_u_incr[2::3]
         }
 
         strain_components = {
@@ -172,7 +218,7 @@ def post_processing(model):
         cell_array=model.element_node_indices.cpu().numpy(),  # This should be the actual cells data from your model
         cell_types=np.full(model.element_node_indices.shape[0], model_cell_types),  # Create an array filled with the cell type
         point_data=point_data,
-        filename=parent_folder / 'results.vtk'
+        filename=parent_folder / f'results_{step}.vtk'
     )
 
 
@@ -182,14 +228,16 @@ def main(args):
     model = initialize_model(args)
     
     run_analysis(model)
-    post_processing(model)
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Finite Element Model Execution')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cpu', help='Device to run the FEM.')
-    parser.add_argument('--geometry_path', type=Path, default='.\example\hw7_Problem1\geometry.yaml', help='Path to the geometry.yaml file.')
-    parser.add_argument('--material_path', type=Path, default='.\example\hw7_Problem1\material.yaml', help='Path to the material.yaml file.')
-    parser.add_argument('--loading_path', type=Path,  default='.\example\hw7_Problem1\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--geometry_path', type=Path, default='.\example\ytest_2d\geometry.yaml', help='Path to the geometry.yaml file.')
+    parser.add_argument('--material_path', type=Path, default='.\example\ytest_2d\material.yaml', help='Path to the material.yaml file.')
+    parser.add_argument('--loading_path', type=Path,  default='.\example\ytest_2d\loading.yaml', help='Path to the loading.yaml file.')
+    parser.add_argument('--nPrint', type=int, default=1, help='Number of steps after which the .vtk files are saved. Controls the frequency of output for visualization.')
+    parser.add_argument('--nLoad', type=int, default=10, help='Number of loading steps.')
     parser.add_argument('--incompatible_mode_element', action='store_true', help='Flag to enable incompatible mode for the element.')
     args = parser.parse_args()
     main(args)

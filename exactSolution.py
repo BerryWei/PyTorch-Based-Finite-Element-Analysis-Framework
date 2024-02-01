@@ -1,50 +1,47 @@
+from scipy.optimize import fsolve
 import numpy as np
-import matplotlib.pyplot as plt
 
-# Given constants for the copper beam
-P_0 = 10  # Harmonic force amplitude in Newtons
-L = 0.15  # Length of the beam in meters
-E = 130 * 1e9  # Young's modulus in Pascals (converted from GPa)
-rho = 8.96 * 1000  # Density in kg/m^3 (converted from g/cm^3)
-height = 0.03  # Width and height of the cross-section in meters
-width = 0.03
-A = width * height  # Cross-sectional area in m^2
-a = L / 2  # Force applied at the midpoint
+def newton_raphson_method(f, J, x0, tol=1e-6, max_iter=100):
+    """
+    Implement Newton-Raphson method for solving non-linear equations.
 
-# Compute the first natural frequency omega_1
-I = (width * height ** 3) / 12  # Moment of inertia of the beam's cross-section
-omega_1 = np.sqrt(E * I / (rho * A)) * (np.pi / L) ** 2
+    :param f: Function representing the system of equations.
+    :param J: Jacobian matrix of the function f.
+    :param x0: Initial guess for the roots.
+    :param tol: Tolerance for convergence.
+    :param max_iter: Maximum number of iterations.
+    :return: Solution vector.
+    """
+    x = x0
+    for _ in range(max_iter):
+        x_new = x - np.linalg.inv(J(x)) @ f(x)
+        if np.linalg.norm(x_new - x) < tol:
+            return x_new
+        x = x_new
+    return x  # Return the last iteration if no convergence within max_iter
 
-# Given omega for the harmonic force
-omega = 0.1 * omega_1
+# Defining the system of equations
+def f(x):
+    x1, x2 = x
+    return np.array([
+        x1 * (x1**2 + x2**2 + 1)**(1/3) - 9/2,
+        x2 * (x1**2 + x2**2 + 1)**(1/4) + 5/2
+    ])
 
-print(f'omega= {omega}')
-# Time and space discretization parameters
-x_points = 100
-t_points = 100
-x = np.linspace(0, L, x_points)
-t = np.linspace(0, 1.0e-4*100, t_points)  # Time range of 1 second for illustration
+# Defining the Jacobian matrix
+def J(x):
+    x1, x2 = x
+    return np.array([
+        [(x1**2 + x2**2 + 1)**(1/3) + x1 * (1/3) * (x1**2 + x2**2 + 1)**(-2/3) * 2 * x1, 
+         x1 * (1/3) * (x1**2 + x2**2 + 1)**(-2/3) * 2 * x2],
+        [x2 * (1/4) * (x1**2 + x2**2 + 1)**(-3/4) * 2 * x1,
+         (x1**2 + x2**2 + 1)**(1/4) + x2 * (1/4) * (x1**2 + x2**2 + 1)**(-3/4) * 2 * x2]
+    ])
 
-# Calculating the exact solution
-def calculate_u(x, t, L, a, omega, P_0, rho, A):
-    u = np.zeros((len(t), len(x)))
-    for n in range(1, 100):  # Summing over n up to 99
-        omega_n = np.sqrt(E * I / (rho * A)) * (n * np.pi / L) ** 2
-        term = (2 * P_0) / (rho * A * L) * 1 / (omega_n ** 2 - omega ** 2) * np.sin(n * np.pi * a / L) * np.sin(n * np.pi * x / L)
-        for i, ti in enumerate(t):
-            u[i, :] += term * np.sin(omega * ti)
-    return u
+# Initial guess
+initial_guess = np.array([1, -1])
 
-# Calculate the solution
-u = calculate_u(x, t, L, a, omega, P_0, rho, A)
+# Applying Newton-Raphson Method
+solution_nr = newton_raphson_method(f, J, initial_guess)
+print(solution_nr)
 
-# Plotting the solution at different times
-plt.figure(figsize=(12, 8))
-for i in range(0, len(t), len(t)//10):
-    plt.plot(x, u[i, :], label=f't = {t[i]:.5f}s')
-plt.title('Displacement of the Copper Beam Over Time')
-plt.xlabel('Position along the beam (m)')
-plt.ylabel('Displacement (m)')
-plt.legend()
-plt.grid(True)
-plt.show()

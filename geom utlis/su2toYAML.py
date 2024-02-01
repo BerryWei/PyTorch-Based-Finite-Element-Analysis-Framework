@@ -37,13 +37,13 @@ def read_su2_file(filepath):
     
     return node_coords, elem_conn
 
-def convert_to_yaml(node_coords, elem_conn, yaml_filepath, dim=2):
+def convert_to_yaml(node_coords, elem_conn, yaml_filepath, dim=3):
     node_coords_clean = [coords[:dim] for coords in node_coords]
     elem_conn_clean = [list(map(lambda x: x , conn)) for conn in elem_conn]
     if dim==3:
         type_name = 'BrickElement'
     else:
-        type_name = 'QuadElement'
+        type_name = 'T3Element'
     
     data_dict = {
         'Element': {
@@ -63,8 +63,8 @@ def convert_to_yaml(node_coords, elem_conn, yaml_filepath, dim=2):
         yaml.dump(data_dict, f, default_flow_style=None)
 
 # File paths
-su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw5_Problem3/rectangle_q4.su2'
-yaml_filepath = r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\hw5_Problem3/geometry.yaml'
+su2_filepath =  r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\project_openHole3d/openHole3d.su2'
+yaml_filepath = r'D:\finite_element_method\PyTorch-Based-Finite-Element-Analysis-Framework\example\project_openHole3d/geometry.yaml'
 
 # Read SU2 file and convert to YAML format
 node_coords, elem_conn = read_su2_file(su2_filepath)
